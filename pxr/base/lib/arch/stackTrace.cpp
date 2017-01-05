@@ -25,6 +25,7 @@
 #include "pxr/base/arch/debugger.h"
 #include "pxr/base/arch/defines.h"
 #include "pxr/base/arch/demangle.h"
+#include "pxr/base/arch/environ.h"
 #include "pxr/base/arch/error.h"
 #include "pxr/base/arch/export.h"
 #include "pxr/base/arch/fileSystem.h"
@@ -198,10 +199,6 @@ static const char* const* stackTraceArgv = nullptr;
 static time_t _GetAppElapsedTime();
 
 
-// asgetenv() want's this but we can't declare it inside the namespace.
-extern char **environ;
-
-
 namespace {
 
 // Return the length of s.
@@ -260,7 +257,7 @@ const char* asgetenv(const char* name)
 {
     if (name) {
         const size_t len = asstrlen(name);
-        for (char** i = environ; *i; ++i) {
+        for (char** i = ArchEnviron(); *i; ++i) {
             const char* var = *i;
             if (asstrneq(var, name, len)) {
                 if (var[len] == '=') {

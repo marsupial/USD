@@ -25,6 +25,7 @@
 
 #include "pxr/base/arch/debugger.h"
 #include "pxr/base/arch/daemon.h"
+#include "pxr/base/arch/environ.h"
 #include "pxr/base/arch/error.h"
 #include "pxr/base/arch/export.h"
 #include "pxr/base/arch/stackTrace.h"
@@ -322,16 +323,12 @@ Arch_DebuggerRunUnrelatedProcessPosix(bool (*cb)(void*), void* data)
     _exit(0);
 }
 
-
-extern char** environ;
-
-
 static
 bool
 Arch_DebuggerAttachExecPosix(void* data)
 {
     char** args = (char**)data;
-    execve(args[0], args, environ);
+    execve(args[0], args, ArchEnviron());
     return false;
 }
 

@@ -14,6 +14,7 @@ pxr_shared_library(arch
         daemon
         debugger
         demangle
+        environ
         error
         errno
         fileSystem
