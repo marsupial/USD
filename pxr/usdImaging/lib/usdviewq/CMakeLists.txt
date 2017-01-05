@@ -3,10 +3,10 @@ set(PXR_PACKAGE usdviewq)
 
 if (NOT PYSIDE_FOUND)
     message(WARNING "Not building ${PXR_PACKAGE} because of missing dependency: PySide")
-    #return()
+    return()
 elseif(NOT PYOPENGL_FOUND)
     message(WARNING "Not building ${PXR_PACKAGE} because of missing dependency: PyOpenGL")
-    #return()
+    return()
 endif()
 
 pxr_shared_library(usdviewq
