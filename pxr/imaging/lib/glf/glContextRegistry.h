@@ -34,7 +34,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
-class GlfGLContextRegistry_Data;
+struct GlfGLContextRegistry_Data;
 
 typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
