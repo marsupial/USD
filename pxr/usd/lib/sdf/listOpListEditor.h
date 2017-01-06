@@ -118,19 +118,19 @@ private:
             return;
         }
 
-        const boost::array<SdfListOpType, 4> opTypes = {
+        const boost::array<SdfListOpType, 4> opTypes = { {
             SdfListOpTypeExplicit,
             SdfListOpTypeAdded,
             SdfListOpTypeDeleted,
             SdfListOpTypeOrdered
-        };
+        } };
 
         // Check if any of the list operation vectors have changed and validate
         // their new contents.
         bool anyChanged = false;
-        boost::array<bool, 4> opListChanged = { 
+        boost::array<bool, 4> opListChanged = { {
             false, false, false, false 
-        };
+        } };
 
         for (int i = 0; i < opTypes.size(); ++i) {
             // If the consumer has specified that only a single op type has

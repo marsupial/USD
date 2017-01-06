@@ -547,7 +547,7 @@ int _LogStackTraceForPid(const char *logfile)
     asitoa(pidBuffer, getpid());
     asitoa(timeBuffer, _GetAppElapsedTime());
     const char* const substitutions[3][2] = {
-        "$pid", pidBuffer, "$log", logfile, "$time", timeBuffer
+        { "$pid", pidBuffer }, { "$log", logfile }, { "$time", timeBuffer }
     };
 
     // Build the argument list.
@@ -751,8 +751,8 @@ _InvokeSessionLogger(const char* progname, const char *stackTrace)
     asitoa(pidBuffer, getpid());
     asitoa(timeBuffer, _GetAppElapsedTime());
     const char* const substitutions[4][2] = {
-        "$pid", pidBuffer, "$time", timeBuffer,
-        "$prog", progname, "$stack", stackTrace
+        { "$pid", pidBuffer }, { "$time", timeBuffer },
+        { "$prog", progname }, { "$stack", stackTrace }
     };
 
     // Build the argument list.
