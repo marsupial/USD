@@ -148,7 +148,7 @@ private:
 
     friend class UsdAttribute;
     friend class UsdStage;
-    friend class UsdStage_ResolveInfoAccess;
+    friend struct UsdStage_ResolveInfoAccess;
     friend class UsdAttributeQuery;
 };
 

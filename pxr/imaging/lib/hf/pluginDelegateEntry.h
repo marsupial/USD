@@ -25,7 +25,7 @@
 #define HF_PLUGIN_DELEGATE_ENTRY_H
 
 class HfPluginDelegateBase;
-class HfPluginDelegateDesc;
+struct HfPluginDelegateDesc;
 
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
