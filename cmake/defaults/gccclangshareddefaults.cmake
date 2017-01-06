@@ -37,7 +37,10 @@ _add_warning_flag("all")
 _add_warning_flag("no-deprecated")
 _add_warning_flag("no-deprecated-declarations")
 # Suppress unused typedef warnings eminating from boost.
-_add_warning_flag("no-unused-local-typedefs")
+if (NOT CMAKE_COMPILER_IS_CLANG OR (CLANG_VERSION_STRING VERSION_GREATER 3.5 OR
+                                    APPLECLANG_VERSION_STRING VERSION_GREATER 6.1))
+    _add_warning_flag("no-unused-local-typedefs")
+endif()
 
 # Turn on C++11, pxr won't build without it. 
 set(_PXR_GCC_CLANG_SHARED_CXX_FLAGS "-std=c++11")
