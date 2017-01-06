@@ -1065,7 +1065,7 @@ _GenericMetadataEnd(SdfSpecType specType, Sdf_TextParserContext *context)
             // values. We want to store the parsed string, but we need to
             // determine whether to unpack it into an SdfUnregisteredListOp
             // or to just store the string directly.
-            auto getOldValue = [context]() {
+            auto getOldValue = [context]() -> const VtValue {
                 VtValue v;
                 if (_HasField(context->path, context->genericMetadataKey,
                               &v, context)
