@@ -39,7 +39,7 @@ _add_warning_flag("no-deprecated-declarations")
 # Suppress unused typedef warnings eminating from boost.
 if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND
     (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 6.1)
-    OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 3.9))
+    OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 3.5))
     _add_warning_flag("no-unused-local-typedefs")
 endif()
 
