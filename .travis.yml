@@ -217,7 +217,12 @@ install:
     TBB_URL=https://www.threadingbuildingblocks.org/sites/default/files/software_releases/mac/${USD_TBB}_osx.tgz
 
     brew install ccache
-    brew install glew double-conversion boost-python qt
+    brew install glew double-conversion boost-python
+
+    ### Qt 4.8
+    wget https://download.qt.io/archive/qt/4.8/4.8.6/qt-opensource-mac-4.8.6-1.dmg -O /tmp/qt-4.8.dmg
+    hdiutil attach /tmp/qt-4.8.dmg
+    sudo installer -pkg "/Volumes/Qt 4.8.6/Qt.mpkg" -target /
 
     ### This is where timeout is hiding
     PATH="$PATH:/usr/local/opt/coreutils/libexec/gnubin"
