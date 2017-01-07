@@ -70,42 +70,6 @@ matrix:
     - os: linux
 
   include:
-    - os: linux
-      sudo: required
-      dist: trusty
-      compiler: gcc-4.8
-      env: COMPILER=g++-4.8 CCOMPILER=gcc-4.8
-
-    - os: linux
-      sudo: required
-      dist: trusty
-      addons: *linux_addons
-      addons:
-        apt:
-          sources: *linux_sources
-          packages: g++-4.9
-      compiler: gcc-4.9
-      env: COMPILER=g++-4.9 CCOMPILER=gcc-4.9
-
-    - os: linux
-      sudo: required
-      dist: trusty
-      addons:
-        apt:
-          sources: *linux_sources
-          packages: g++-5
-      compiler: gcc-5
-      env: COMPILER=g++-5 CCOMPILER=gcc-5
-
-    - os: linux
-      sudo: required
-      dist: trusty
-      addons:
-        apt:
-          sources: *linux_sources
-          packages: g++-6
-      compiler: gcc-6
-      env: COMPILER=g++-6 CCOMPILER=gcc-6
 
     - os: linux
       sudo: required
@@ -143,6 +107,43 @@ matrix:
           packages: ['clang-3.8', 'libstdc++-6-dev']
       compiler: clang-3.8
       env: COMPILER=clang++-3.8 CCOMPILER=clang-3.8
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      compiler: gcc-4.8
+      env: COMPILER=g++-4.8 CCOMPILER=gcc-4.8
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons: *linux_addons
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: g++-4.9
+      compiler: gcc-4.9
+      env: COMPILER=g++-4.9 CCOMPILER=gcc-4.9
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: g++-5
+      compiler: gcc-5
+      env: COMPILER=g++-5 CCOMPILER=gcc-5
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: g++-6
+      compiler: gcc-6
+      env: COMPILER=g++-6 CCOMPILER=gcc-6
 
     - os: osx
       osx_image: xcode7.3
