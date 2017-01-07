@@ -218,11 +218,7 @@ install:
 
     brew install ccache
     brew install glew double-conversion boost-python
-
-    ### Qt 4.8
-    wget https://download.qt.io/archive/qt/4.8/4.8.6/qt-opensource-mac-4.8.6-1.dmg -O /tmp/qt-4.8.dmg
-    hdiutil attach /tmp/qt-4.8.dmg
-    sudo installer -pkg "/Volumes/Qt 4.8.6/Qt.mpkg" -target /
+    brew install pyside
 
     ### This is where timeout is hiding
     PATH="$PATH:/usr/local/opt/coreutils/libexec/gnubin"
@@ -240,7 +236,7 @@ install:
 
 - |
   ### Python Dependencies
-  pip install jinja2 PyOpenGL PySide
+  pip install jinja2 PyOpenGL
 
 - |
   ### ilmbase and OpenEXR 2.2.0
