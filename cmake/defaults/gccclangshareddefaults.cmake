@@ -36,6 +36,20 @@ _add_warning_flag("all")
 # We use hash_map, suppress deprecation warning.
 _add_warning_flag("no-deprecated")
 _add_warning_flag("no-deprecated-declarations")
+
+message("INFO CMAKE_COMPILER_IS_CLANG: ${CMAKE_COMPILER_IS_CLANG}, CLANG_VERSION_STRING: ${CLANG_VERSION_STRING}, APPLECLANG_VERSION_STRING: ${APPLECLANG_VERSION_STRING}")
+message("INFO CLANG_VERSION_MAJOR: ${CLANG_VERSION_MAJOR}, CLANG_VERSION_MINOR: ${CLANG_VERSION_MINOR}")
+message("INFO CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
+if(CMAKE_COMPILER_IS_CLANG)
+  message(CMAKE_COMPILER_IS_CLANG)
+endif()
+if(CLANG_VERSION_STRING)
+  message(CLANG_VERSION_STRING)
+endif()
+if(APPLECLANG_VERSION_STRING)
+  message(APPLECLANG_VERSION_STRING)
+endif()
+
 # Suppress unused typedef warnings eminating from boost.
 if (NOT CMAKE_COMPILER_IS_CLANG OR (CLANG_VERSION_STRING VERSION_GREATER 3.5 OR
                                     APPLECLANG_VERSION_STRING VERSION_GREATER 6.1))
