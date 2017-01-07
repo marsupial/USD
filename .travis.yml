@@ -24,9 +24,6 @@
 
 # USD requires several dependencies that are available via
 # apt-get if using the trusty build environment.
-sudo: required
-dist: trusty
-
 language: cpp
 
 branches:
@@ -34,120 +31,290 @@ branches:
     - master
     - dev
 
+addons: &linux_addons
+  apt:
+    sources: &linux_sources
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-precise-3.5
+      - llvm-toolchain-precise-3.6
+      - llvm-toolchain-precise-3.7
+      - llvm-toolchain-precise-3.8
+      - llvm-toolchain-precise
+
+env:
+  global:
+    - USE_CCACHE=1
+    - CCACHE_COMPRESS=1
+    - CCACHE_MAXSIZE=500M
+    - CCACHE_CPP2=1
+
+cache:
+  apt: true
+  ccache: true
+  directories:
+    - $HOME/.ccache
+    - $HOME/openexr
+    - $HOME/osd
+    - $HOME/oiio
+    - $HOME/ptex
+    - $HOME/tbb43_20141023oss
+    - $HOME/tbb2017_20160722oss
+
+matrix:
+  ### Mark failure as soon as one single entry does
+  fast_finish: true
+
+  exclude:
+    ### Note: Workaround travis-ci/travis-ci#4681
+    - os: osx
+    - os: linux
+
+  include:
+    - os: linux
+      sudo: required
+      dist: trusty
+      compiler: gcc-4.8
+      env: COMPILER=g++-4.8 CCOMPILER=gcc-4.8
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons: *linux_addons
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: g++-4.9
+      compiler: gcc-4.9
+      env: COMPILER=g++-4.9 CCOMPILER=gcc-4.9
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: g++-5
+      compiler: gcc-5
+      env: COMPILER=g++-5 CCOMPILER=gcc-5
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: g++-6
+      compiler: gcc-6
+      env: COMPILER=g++-6 CCOMPILER=gcc-6
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      compiler: clang-3.5
+      ### FIXME: $PATH error using clang++ with USD CMake and ccache
+      env: COMPILER=/usr/local/clang-3.5.0/bin/clang++ CCOMPILER=/usr/local/clang-3.5.0/bin/clang
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: ['clang-3.6', 'libstdc++-5-dev']
+      compiler: clang-3.6
+      env: COMPILER=clang++-3.6 CCOMPILER=clang-3.6
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: ['clang-3.7', 'libstdc++-5-dev']
+      compiler: clang-3.7
+      env: COMPILER=clang++-3.7 CCOMPILER=clang-3.7
+
+    - os: linux
+      sudo: required
+      dist: trusty
+      addons:
+        apt:
+          sources: *linux_sources
+          packages: ['clang-3.8', 'libstdc++-6-dev']
+      compiler: clang-3.8
+      env: COMPILER=clang++-3.8 CCOMPILER=clang-3.8
+
+    - os: osx
+      osx_image: xcode7.3
+      compiler: clang
+      env: COMPILER=clang++ CCOMPILER=clang
+
+    - os: osx
+      osx_image: xcode8
+      compiler: clang
+      env: COMPILER=clang++ CCOMPILER=clang
+
+    - os: osx
+      osx_image: xcode8.2
+      compiler: clang
+      env: COMPILER=clang++ CCOMPILER=clang
+
 before_install:
-  - sudo apt-get -qq update
+- |
+  $COMPILER -v
+  export CXX="ccache $COMPILER"
+  export CC="ccache $CCOMPILER"
+  ### Show the build script in its entirety
+  #cat "$HOME/build.sh" | curl -sT - chunk.io
 
 install:
   ######
   ### DEPENDENCIES FOR USD CORE
   #####
 
-  ### boost v1.55
-  ### We install only the packages we need for faster turnaround
-  - sudo apt-get install libboost-iostreams1.55.0 libboost-iostreams1.55-dev
-  - sudo apt-get install libboost-python1.55.0 libboost-python1.55-dev
-  - sudo apt-get install libboost-regex1.55.0 libboost-regex1.55-dev
-  - sudo apt-get install libboost-system1.55.0 libboost-system1.55-dev
-  - sudo apt-get install libboost-program-options1.55.0 libboost-program-options1.55-dev
-
-  ### double-conversion
-  ### USD docs currently claim we require 1.1.1, but apt-get gives us 2.0.1 on trusty.
-  ### Building 1.1.1 as a shared library is annoying, so we'll go with this for now.
-  - sudo apt-get install libdouble-conversion-dev
+- |
+  ### DEPENDENCIES FOR USD CORE
 
   ### Intel TBB v4.3 update 1
-  - if [ ! -d "$HOME/tbb43_20141023oss/lib" ]; then
-      wget https://www.threadingbuildingblocks.org/sites/default/files/software_releases/linux/tbb43_20141023oss_lin.tgz -O /tmp/tbb.tgz;
-      tar -xvzf /tmp/tbb.tgz -C $HOME;
+  USD_TBB=tbb43_20141023oss
+
+  if [ $TRAVIS_OS_NAME == 'linux' ]; then
+    ### Intel TBB 4.4 Update 5 (clang & c++11 needs libc++ until this release)
+    if [[ $COMPILER == *clang* ]]; then
+      if [ -d "$HOME/$USD_TBB" ]; then
+        rm -rf $HOME/$USD_TBB
+      fi
+      USD_TBB=tbb2017_20160722oss
+      TBB_URL=https://www.threadingbuildingblocks.org/sites/default/files/software_releases/linux/${USD_TBB}_lin_0.tgz
+      TBB_FLAGS="-DCMAKE_CXX_FLAGS=-DTBB_USE_GLIBCXX_VERSION=40800"
     else
-      echo 'Using cached TBB';
+      TBB_URL=https://www.threadingbuildingblocks.org/sites/default/files/software_releases/linux/${USD_TBB}_lin.tgz
     fi
 
+    sudo apt-get -qq update
+
+    ### boost v1.55
+    ### We install only the packages we need for faster turnaround
+    sudo apt-get install libboost-iostreams1.55.0 libboost-iostreams1.55-dev \
+           libboost-python1.55.0 libboost-python1.55-dev libboost-regex1.55.0 \
+           libboost-regex1.55-dev libboost-system1.55.0 libboost-system1.55-dev \
+           libboost-program-options1.55.0 libboost-program-options1.55-dev \
+           libboost-filesystem1.55.0 libboost-filesystem1.55-dev \
+           libboost-thread1.55.0 libboost-thread1.55-dev
+    ### double-conversion
+    ### USD docs currently claim we require 1.1.1, but apt-get gives us 2.0.1 on trusty.
+    ### Building 1.1.1 as a shared library is annoying, so we'll go with this for now.
+    sudo apt-get install libdouble-conversion-dev
+
+    ### For OpenSubdiv 3.0.5
+    sudo apt-get install libxrandr-dev libxcursor-dev libxinerama-dev libglfw-dev
+
+    ### For USDIMAGING
+    sudo apt-get install libglew-dev python-pyside pyside-tools
+
+  elif [ $TRAVIS_OS_NAME == 'osx' ] ; then
+    TBB_URL=https://www.threadingbuildingblocks.org/sites/default/files/software_releases/mac/${USD_TBB}_osx.tgz
+
+    brew install ccache
+    brew install glew double-conversion boost-python qt
+
+    ### This is where timeout is hiding
+    PATH="$PATH:/usr/local/opt/coreutils/libexec/gnubin"
+  fi
+
+- |
+  ### Intel TBB
+  if [ ! -d "$HOME/$USD_TBB/lib" ]; then
+    wget "$TBB_URL" -O /tmp/tbb.tgz;
+    tar -xzf /tmp/tbb.tgz -C $HOME;
+  else
+    echo 'Using cached TBB: $USD_TBB';
+  fi
+  export TBB_FLAGS="$TBB_FLAGS -DTBB_ROOT_DIR=$HOME/$USD_TBB"
+
+- |
+  ### Python Dependencies
+  pip install jinja2 PyOpenGL PySide
+
+- |
   ### ilmbase and OpenEXR 2.2.0
-  - if [ ! -d "$HOME/openexr/lib" ]; then
-      wget http://download.savannah.nongnu.org/releases/openexr/ilmbase-2.2.0.tar.gz -O /tmp/ilmbase.tgz;
-      tar -xvzf /tmp/ilmbase.tgz -C $HOME;
-      pushd $HOME/ilmbase-2.2.0;
-      ./configure --prefix=$HOME/openexr;
-      make && make install;
-      popd;
-      wget http://download.savannah.nongnu.org/releases/openexr/openexr-2.2.0.tar.gz -O /tmp/openexr.tgz;
-      tar -xvzf /tmp/openexr.tgz -C $HOME;
-      pushd $HOME/openexr-2.2.0;
-      ./configure --prefix=$HOME/openexr --with-pkg-config=no LDFLAGS="-Wl,-rpath -Wl,$HOME/openexr/lib";
-      make && make install;
-      popd;
-    else
-      echo 'Using cached OpenEXR';
-    fi
+  if [ ! -d "$HOME/openexr/lib" ]; then
+    wget http://download.savannah.nongnu.org/releases/openexr/ilmbase-2.2.0.tar.gz -O /tmp/ilmbase.tgz;
+    tar -xzf /tmp/ilmbase.tgz -C $HOME;
+    pushd $HOME/ilmbase-2.2.0;
+    ./configure --prefix=$HOME/openexr;
+    make -j4 install;
+    popd;
+    wget http://download.savannah.nongnu.org/releases/openexr/openexr-2.2.0.tar.gz -O /tmp/openexr.tgz;
+    tar -xzf /tmp/openexr.tgz -C $HOME;
+    pushd $HOME/openexr-2.2.0;
+    ./configure --prefix=$HOME/openexr --with-pkg-config=no LDFLAGS="-Wl,-rpath -Wl,$HOME/openexr/lib";
+    make -j4 install;
+    popd;
+  else
+    echo 'Using cached OpenEXR';
+  fi
 
-  ######
-  ### DEPENDENCIES FOR IMAGING
-  #####
-
-  ### GLEW 1.10.0
-  - sudo apt-get install libglew-dev
-
+- |
   ### OpenSubdiv 3.0.5
-  - sudo apt-get install libxrandr-dev libxcursor-dev libxinerama-dev libglfw-dev
-  - if [ ! -d "$HOME/osd/lib" ]; then
-      wget https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_0_5.tar.gz -O /tmp/osd.tgz;
-      tar -xvzf /tmp/osd.tgz -C $HOME;
-      pushd $HOME/OpenSubdiv-3_0_5;
-      mkdir build && cd build;
-      cmake -DCMAKE_INSTALL_PREFIX=$HOME/osd -DNO_EXAMPLES=1 -DNO_TUTORIALS=1 -DNO_REGRESSION=1 -D NO_MAYA=1 -D NO_PTEX=1 -D NO_DOC=1 -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 ..;
-      make && make install;
-      popd;
-    else
-      echo 'Using cached OpenSubdiv';
-    fi
+  if [ ! -d "$HOME/osd/lib" ]; then
+    wget https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_0_5.tar.gz -O /tmp/osd.tgz;
+    tar -xzf /tmp/osd.tgz -C $HOME;
+    pushd $HOME/OpenSubdiv-3_0_5;
+    mkdir build && cd build;
+    cmake -DCMAKE_INSTALL_PREFIX=$HOME/osd -DNO_EXAMPLES=1 -DNO_TUTORIALS=1 -DNO_REGRESSION=1 -D NO_MAYA=1 -D NO_PTEX=1 -D NO_DOC=1 -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 ..;
+    make -j4 install;
+    popd;
+  else
+    echo 'Using cached OpenSubdiv';
+  fi
 
+- |
   ### OpenImageIO 1.5.11
-  - sudo apt-get install libboost-filesystem1.55.0 libboost-filesystem1.55-dev
-  - sudo apt-get install libboost-thread1.55.0 libboost-thread1.55-dev
-  - if [ ! -d "$HOME/oiio/lib" ]; then
-      wget https://github.com/OpenImageIO/oiio/archive/Release-1.5.11.tar.gz -O /tmp/oiio.tgz;
-      tar -xvzf /tmp/oiio.tgz -C $HOME;
-      pushd $HOME/oiio-Release-1.5.11;
-      mkdir build && cd build;
-      cmake -DCMAKE_INSTALL_PREFIX=$HOME/oiio -DILMBASE_HOME=$HOME/openexr -DOPENEXR_HOME=$HOME/openexr ..;
-      make && make install;
-      popd;
-    else
-      echo 'Using cached OpenImageIO';
-    fi
+  if [ ! -d "$HOME/oiio/lib" ]; then
+    wget https://github.com/OpenImageIO/oiio/archive/Release-1.5.11.tar.gz -O /tmp/oiio.tgz;
+    tar -xzf /tmp/oiio.tgz -C $HOME;
+    pushd $HOME/oiio-Release-1.5.11;
+    mkdir build && cd build;
+    cmake -DCMAKE_INSTALL_PREFIX=$HOME/oiio -DILMBASE_HOME=$HOME/openexr -DOPENEXR_HOME=$HOME/openexr -DSTOP_ON_WARNING=OFF ..;
+    make -j4 install;
+    popd;
+  else
+    echo 'Using cached OpenImageIO';
+  fi
 
+- |
   ### Ptex 2.0.30
-  - if [ ! -d "$HOME/ptex/lib" ]; then
-      wget https://github.com/wdas/ptex/archive/v2.0.30.tar.gz -O /tmp/ptex.tgz;
-      tar -xvzf /tmp/ptex.tgz -C $HOME;
-      pushd $HOME/ptex-2.0.30/src;
-      make;
-      mv $HOME/ptex-2.0.30/install/* $HOME/ptex;
-      popd;
-    else
-      echo 'Using cached Ptex';
-    fi
-
-  ######
-  ### DEPENDENCIES FOR USDIMAGING
-  #####
-
-  ### PySide 1.2.2
-  - sudo apt-get install python-pyside pyside-tools
-
-cache:
-  directories:
-    - $HOME/openexr
-    - $HOME/osd
-    - $HOME/oiio
-    - $HOME/ptex
-    - $HOME/tbb43_20141023oss
+  if [ ! -d "$HOME/ptex/lib" ]; then
+    wget https://github.com/wdas/ptex/archive/v2.0.30.tar.gz -O /tmp/ptex.tgz;
+    tar -xzf /tmp/ptex.tgz -C $HOME;
+    pushd $HOME/ptex-2.0.30/src;
+    make -j4;
+    mv $HOME/ptex-2.0.30/install/* $HOME/ptex;
+    popd;
+  else
+    echo 'Using cached Ptex';
+  fi
 
 script:
-  - mkdir build && cd build
-  - cmake -DTBB_ROOT_DIR=$HOME/tbb43_20141023oss -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF ..
-  - echo 'Building with -j4'
-  - make -j4
-  # Default install location is /usr/local; we need sudo access to write there.
-  - sudo make install
+- |
+  ### Timeout after we've run for 40 min so there is time to upload caches, and
+  ### only start the build if we have more than 5 minutes left
+  echo "SECONDS: $SECONDS"
+  USD_TIMEOUT=`expr 2100 - $SECONDS`
+  echo "USD_TIMEOUT: $USD_TIMEOUT"
+  if [[ $USD_TIMEOUT -ge 300 ]]; then
+    mkdir build && cd build
+    echo "cmake $TBB_FLAGS -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF .."
+    cmake $TBB_FLAGS -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF ..
+
+    echo 'Building with -j4, for $USD_TIMEOUT seconds'
+    # If Travis timesout, objects can be corrupted in the cache & cause link errors
+    timeout -s SIGTERM "${USD_TIMEOUT}s" make -j4
+    # Default install location is /usr/local; we need sudo access to write there.
+    sudo make install
+  else
+    echo 'Skipped build of USD (USD_TIMEOUT was: $USD_TIMEOUT)'
+    ### Last command must generate an error, so build marked as failing
+    bash -c "exit 174"
+  fi
