@@ -309,16 +309,18 @@ script:
   ### only start the build if we have more than 5 minutes left
   echo "SECONDSa: $SECONDS"
   SECONDS=$(expr `date +%s` - $USD_START)
-  echo "SECONDSb: $SECONDS"
+  echo "SECONDSb: ${SECONDS}"
   USD_TIMEOUT=`expr 2100 - $SECONDS`
-  echo "USD_TIMEOUT: $USD_TIMEOUT"
+  echo "USD_TIMEOUT: ${USD_TIMEOUT}"
+  USD_TIMEOUT=2000
   if [[ $USD_TIMEOUT -ge 300 ]]; then
     mkdir build && cd build
     echo "cmake $TBB_FLAGS -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF .."
     cmake $TBB_FLAGS -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF ..
 
-    echo 'Building with -j4, for $USD_TIMEOUT seconds'
+    echo "Building with -j4, for ${USD_TIMEOUT} seconds"
     # If Travis timesout, objects can be corrupted in the cache & cause link errors
+    echo timeout -s SIGTERM "${USD_TIMEOUT}s" make -j4
     timeout -s SIGTERM "${USD_TIMEOUT}s" make -j4
     # Default install location is /usr/local; we need sudo access to write there.
     sudo make install
