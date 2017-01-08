@@ -165,7 +165,18 @@ before_install:
   $COMPILER -v
   export CXX="ccache $COMPILER"
   export CC="ccache $CCOMPILER"
-  USD_START=$(date +%s)
+
+  ### Return time remaining from 40 minutes since start of script and 
+  ### make sure remaining time is more than argument (if given)
+  function TimeRemaing {
+    TIMEOUT=40
+    REMAIN=$(expr $TIMEOUT - $SECONDS / 60)
+    if [[ $REMAIN -lt 0 || (! -z "$1" && $REMAIN -lt $1 ) ]]; then
+      return
+    fi
+    echo $REMAIN
+  }
+
   ### Show the build script in its entirety
   #cat "$HOME/build.sh" | curl -sT - chunk.io
 
@@ -245,8 +256,9 @@ install:
   python -c "import PySide"
 
 - |
+  echo `TimeRemaing`
   ### ilmbase and OpenEXR 2.2.0
-  if [ ! -d "$HOME/openexr/lib" ]; then
+  if [[ ! -z $(TimeRemaing 15)  && ! -d "$HOME/openexr/lib" ]]; then
     wget http://download.savannah.nongnu.org/releases/openexr/ilmbase-2.2.0.tar.gz -O /tmp/ilmbase.tgz;
     tar -xzf /tmp/ilmbase.tgz -C $HOME;
     pushd $HOME/ilmbase-2.2.0;
@@ -264,8 +276,9 @@ install:
   fi
 
 - |
+  echo `TimeRemaing`
   ### OpenSubdiv 3.0.5
-  if [ ! -d "$HOME/osd/lib" ]; then
+  if [[ ! -z $(TimeRemaing 15)  && ! -d "$HOME/osd/lib" ]]; then
     wget https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_0_5.tar.gz -O /tmp/osd.tgz;
     tar -xzf /tmp/osd.tgz -C $HOME;
     pushd $HOME/OpenSubdiv-3_0_5;
@@ -278,8 +291,9 @@ install:
   fi
 
 - |
+  echo `TimeRemaing`
   ### OpenImageIO 1.5.11
-  if [ ! -d "$HOME/oiio/lib" ]; then
+  if [[ ! -z $(TimeRemaing 15)  && ! -d "$HOME/oiio/lib" ]]; then
     wget https://github.com/OpenImageIO/oiio/archive/Release-1.5.11.tar.gz -O /tmp/oiio.tgz;
     tar -xzf /tmp/oiio.tgz -C $HOME;
     pushd $HOME/oiio-Release-1.5.11;
@@ -293,7 +307,8 @@ install:
 
 - |
   ### Ptex 2.0.30
-  if [ ! -d "$HOME/ptex/lib" ]; then
+  echo `TimeRemaing`
+  if [[ ! -z $(TimeRemaing 10)  && ! -d "$HOME/ptex/lib" ]]; then
     wget https://github.com/wdas/ptex/archive/v2.0.30.tar.gz -O /tmp/ptex.tgz;
     tar -xzf /tmp/ptex.tgz -C $HOME;
     pushd $HOME/ptex-2.0.30/src;
@@ -308,13 +323,9 @@ script:
 - |
   ### Timeout after we've run for 40 min so there is time to upload caches, and
   ### only start the build if we have more than 5 minutes left
-  echo "SECONDSa: $SECONDS"
-  SECONDS=$(expr `date +%s` - $USD_START)
-  echo "SECONDSb: ${SECONDS}"
-  USD_TIMEOUT=`expr 2100 - $SECONDS`
-  echo "USD_TIMEOUT: ${USD_TIMEOUT}"
-  USD_TIMEOUT=2000
-  if [[ $USD_TIMEOUT -ge 300 ]]; then
+  echo `TimeRemaing`
+  USD_TIMEOUT=`TimeRemaing 5`
+  if [ ! -z $USD_TIMEOUT ]; then
     mkdir build && cd build
     echo "cmake $TBB_FLAGS -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF .."
     cmake $TBB_FLAGS -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF ..
@@ -322,7 +333,7 @@ script:
     echo "Building with -j4, for ${USD_TIMEOUT} seconds"
     # If Travis timesout, objects can be corrupted in the cache & cause link errors
     echo timeout -s SIGTERM "${USD_TIMEOUT}s" make -j4
-    timeout -s SIGTERM "${USD_TIMEOUT}s" make -j4
+    timeout -s SIGTERM "${USD_TIMEOUT}m" make -j4
     # Default install location is /usr/local; we need sudo access to write there.
     sudo make install
   else
