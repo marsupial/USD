@@ -214,6 +214,9 @@ install:
     ### For USDIMAGING
     sudo apt-get install libglew-dev python-pyside pyside-tools
 
+    ### Travis python bin is at /opt/python2.7, but apt installs to  /usr/lib/python2.7
+    export PYTHONPATH="$PYTHONPATH:/usr/lib/python2.7/dist-packages"
+
   elif [ $TRAVIS_OS_NAME == 'osx' ] ; then
     TBB_URL=https://www.threadingbuildingblocks.org/sites/default/files/software_releases/mac/${USD_TBB}_osx.tgz
 
@@ -239,8 +242,6 @@ install:
   ### Python Dependencies
   pip install jinja2 PyOpenGL
   ls -l /usr/lib/python2.7/dist-packages
-  python -c "import PySide"
-  export PYTHONPATH="$PYTHONPATH:/usr/lib/python2.7/dist-packages"
   python -c "import PySide"
 
 - |
