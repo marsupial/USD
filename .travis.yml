@@ -165,6 +165,7 @@ before_install:
   $COMPILER -v
   export CXX="ccache $COMPILER"
   export CC="ccache $CCOMPILER"
+  USD_START=$(date +%s)
   ### Show the build script in its entirety
   #cat "$HOME/build.sh" | curl -sT - chunk.io
 
@@ -306,7 +307,9 @@ script:
 - |
   ### Timeout after we've run for 40 min so there is time to upload caches, and
   ### only start the build if we have more than 5 minutes left
-  echo "SECONDS: $SECONDS"
+  echo "SECONDSa: $SECONDS"
+  SECONDS=$(expr `date +%s` - $USD_START)
+  echo "SECONDSb: $SECONDS"
   USD_TIMEOUT=`expr 2100 - $SECONDS`
   echo "USD_TIMEOUT: $USD_TIMEOUT"
   if [[ $USD_TIMEOUT -ge 300 ]]; then
