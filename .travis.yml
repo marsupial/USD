@@ -237,6 +237,10 @@ install:
 - |
   ### Python Dependencies
   pip install jinja2 PyOpenGL
+  ls -l /usr/lib/python2.7/dist-packages
+  python -c "import PySide"
+  export PYTHONPATH="$PYTHONPATH:/usr/lib/python2.7/dist-packages"
+  python -c "import PySide"
 
 - |
   ### ilmbase and OpenEXR 2.2.0
