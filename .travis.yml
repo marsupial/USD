@@ -57,8 +57,7 @@ cache:
     - $HOME/osd
     - $HOME/oiio
     - $HOME/ptex
-    - $HOME/tbb43_20141023oss
-    - $HOME/tbb2017_20160722oss
+    - $HOME/tbb
 
 matrix:
   # Mark failure as soon as one single entry does
@@ -174,6 +173,37 @@ before_install:
     fi
   }
 
+  # Download and unarchive a tar, gzipped file into a temporary directory
+  # and return that directory's path
+  function UsdExtractUrlGZ {
+    local DSTDIR=`mktemp -d 2>/dev/null || mktemp -d -t 'tmpdir'`
+    wget -qO- "$1" | tar -xz --strip-components=1 -C $DSTDIR
+    echo $DSTDIR
+  }
+
+  # Move the lib & include from directory 1 into directory 2
+  function UsdMvLibAndInclude {
+    mv "$1/lib" "$2/"
+    mv "$1/include" "$2/"
+  }
+
+  function UsdMakeBuild {
+    pushd "$(UsdExtractUrlGZ $1)"
+    shift; local PREFIX=$1; shift;
+    ./configure --prefix=$PREFIX "$@"
+    make -j4 install
+    popd
+  }
+
+  function UsdCmakeBuild {
+    pushd "$(UsdExtractUrlGZ $1)"
+    shift; local PREFIX=$1; shift;
+    mkdir build && cd build
+    cmake $CMAKE_FLAGS -DCMAKE_INSTALL_PREFIX=$PREFIX "$@" ..
+    make -j4 install
+    popd
+  }
+
 install:
 - |
   ### USD dependencies
@@ -184,9 +214,6 @@ install:
   if [ $TRAVIS_OS_NAME == 'linux' ]; then
     ### Intel TBB 4.4 Update 5 (clang & c++11 needs libc++ until this release)
     if [[ $COMPILER == *clang* ]]; then
-      if [ -d "$HOME/$USD_TBB" ]; then
-        rm -rf $HOME/$USD_TBB
-      fi
       USD_TBB=tbb2017_20160722oss
       TBB_URL=https://www.threadingbuildingblocks.org/sites/default/files/software_releases/linux/${USD_TBB}_lin_0.tgz
       CMAKE_FLAGS="-DCMAKE_CXX_FLAGS=-DTBB_USE_GLIBCXX_VERSION=40800"
@@ -258,15 +285,6 @@ install:
   fi
 
 - |
-  ### Intel TBB
-  if [ ! -d "$HOME/$USD_TBB/lib" ]; then
-    wget "$TBB_URL" -O /tmp/tbb.tgz;
-    tar -xzf /tmp/tbb.tgz -C $HOME;
-  else
-    echo 'Using cached TBB: $USD_TBB';
-  fi
-
-- |
   ### Python Dependencies
   pip install jinja2 PyOpenGL
   ### Travis python bin is at /opt/python2.7, but apt installs to  /usr/lib/python2.7
@@ -275,63 +293,47 @@ install:
   fi
 
 - |
+  ### Intel TBB
+  if [ ! -d "$HOME/tbb/lib" ]; then
+    UsdMvLibAndInclude "$(UsdExtractUrlGZ "$TBB_URL")" "$HOME/tbb"
+  else
+    echo 'Using cached TBB';
+  fi
+
+- |
   ### ilmbase and OpenEXR 2.2.0
   if [ $(UsdTimeRemaing 5) ] && [ ! -d "$HOME/openexr/lib" ]; then
-    wget http://download.savannah.nongnu.org/releases/openexr/ilmbase-2.2.0.tar.gz -O /tmp/ilmbase.tgz;
-    tar -xzf /tmp/ilmbase.tgz -C $HOME;
-    pushd $HOME/ilmbase-2.2.0;
-    ./configure --prefix=$HOME/openexr;
-    make -j4 install;
-    popd;
-    wget http://download.savannah.nongnu.org/releases/openexr/openexr-2.2.0.tar.gz -O /tmp/openexr.tgz;
-    tar -xzf /tmp/openexr.tgz -C $HOME;
-    pushd $HOME/openexr-2.2.0;
-    ./configure --prefix=$HOME/openexr --with-pkg-config=no LDFLAGS="-Wl,-rpath -Wl,$HOME/openexr/lib";
-    make -j4 install;
-    popd;
+    UsdMakeBuild http://download.savannah.nongnu.org/releases/openexr/ilmbase-2.2.0.tar.gz $HOME/openexr
+    UsdMakeBuild http://download.savannah.nongnu.org/releases/openexr/openexr-2.2.0.tar.gz $HOME/openexr --with-pkg-config=no LDFLAGS="-Wl,-rpath -Wl,$HOME/openexr/lib"
   else
-    echo 'Using cached OpenEXR';
+    echo 'Using cached OpenEXR'
   fi
 
 - |
   ### OpenSubdiv 3.0.5
   if [ $(UsdTimeRemaing 5) ] && [ ! -d "$HOME/osd/lib" ]; then
-    wget https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_0_5.tar.gz -O /tmp/osd.tgz;
-    tar -xzf /tmp/osd.tgz -C $HOME;
-    pushd $HOME/OpenSubdiv-3_0_5;
-    mkdir build && cd build;
-    cmake $CMAKE_FLAGS -DCMAKE_INSTALL_PREFIX=$HOME/osd -DNO_EXAMPLES=1 -DNO_TUTORIALS=1 -DNO_REGRESSION=1 -D NO_MAYA=1 -D NO_PTEX=1 -D NO_DOC=1 -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 ..;
-    make -j4 install;
-    popd;
+    UsdCmakeBuild https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_0_5.tar.gz $HOME/osd -DNO_EXAMPLES=1 -DNO_TUTORIALS=1 -DNO_REGRESSION=1 -DNO_MAYA=1 -DNO_PTEX=1 -DNO_DOC=1 -DNO_OMP=1 -DNO_TBB=1 -DNO_CUDA=1 -DNO_OPENCL=1 -DNO_CLEW=1 ..
   else
-    echo 'Using cached OpenSubdiv';
+    echo 'Using cached OpenSubdiv'
   fi
 
 - |
   ### OpenImageIO 1.5.11
   if [ $(UsdTimeRemaing 10) ] && [ ! -d "$HOME/oiio/lib" ]; then
-    wget https://github.com/OpenImageIO/oiio/archive/Release-1.5.11.tar.gz -O /tmp/oiio.tgz;
-    tar -xzf /tmp/oiio.tgz -C $HOME;
-    pushd $HOME/oiio-Release-1.5.11;
-    mkdir build && cd build;
-    cmake $CMAKE_FLAGS -DCMAKE_INSTALL_PREFIX=$HOME/oiio -DILMBASE_HOME=$HOME/openexr -DOPENEXR_HOME=$HOME/openexr -DSTOP_ON_WARNING=OFF ..;
-    make -j4 install;
-    popd;
+    UsdCmakeBuild https://github.com/OpenImageIO/oiio/archive/Release-1.5.11.tar.gz $HOME/oiio -DILMBASE_HOME=$HOME/openexr -DOPENEXR_HOME=$HOME/openexr -DSTOP_ON_WARNING=OFF ..
   else
-    echo 'Using cached OpenImageIO';
+    echo 'Using cached OpenImageIO'
   fi
 
 - |
   ### Ptex 2.0.30
   if [ $(UsdTimeRemaing 5) ] && [ ! -d "$HOME/ptex/lib" ]; then
-    wget https://github.com/wdas/ptex/archive/v2.0.30.tar.gz -O /tmp/ptex.tgz;
-    tar -xzf /tmp/ptex.tgz -C $HOME;
-    pushd $HOME/ptex-2.0.30/src;
-    make -j4;
-    mv $HOME/ptex-2.0.30/install/* $HOME/ptex;
-    popd;
+    pushd "$(UsdExtractUrlGZ https://github.com/wdas/ptex/archive/v2.0.30.tar.gz)/src"
+    make -j4
+    UsdMvLibAndInclude "../install/" "$HOME/ptex"
+    popd
   else
-    echo 'Using cached Ptex';
+    echo 'Using cached Ptex'
   fi
 
 script:
@@ -340,8 +342,8 @@ script:
   USD_TIMEOUT=`UsdTimeRemaing 5`
   if [ $(UsdTimeRemaing 5) ]; then
     mkdir build && cd build
-    echo "cmake $CMAKE_FLAGS -DTBB_ROOT_DIR=$HOME/$USD_TBB -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF .."
-    cmake $CMAKE_FLAGS -DTBB_ROOT_DIR=$HOME/$USD_TBB -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF ..
+    echo "cmake $CMAKE_FLAGS -DTBB_ROOT_DIR=$HOME/tbb -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF .."
+    cmake $CMAKE_FLAGS -DTBB_ROOT_DIR=$HOME/tbb -DOPENEXR_LOCATION=$HOME/openexr -DOIIO_LOCATION=$HOME/oiio -DOPENSUBDIV_ROOT_DIR=$HOME/osd -DPTEX_LOCATION=$HOME/ptex -DPXR_VALIDATE_GENERATED_CODE=OFF ..
 
     # Timeout after we've run for USD_TIMEOUT min so there is time to upload caches
     echo "Building with -j4, for ${USD_TIMEOUT} minutes"
