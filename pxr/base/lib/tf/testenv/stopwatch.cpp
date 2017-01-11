@@ -45,6 +45,14 @@ Pause(double seconds)
     pauseWatch.Stop();
 }
 
+static double FuzzyTime(double x) {
+#if defined(__apple_build_version__) &&  __apple_build_version__ > 8000038
+    // Double the fuzziness when built with Xcode > 8.1
+    return x * 2.0;
+#endif
+    return x;
+}
+
 static bool
 Test_TfStopwatch()
 {
@@ -79,7 +87,7 @@ Test_TfStopwatch()
     watch1.Stop();
 
     // The value of watch1 should be "near" 0.5 seconds
-    if (fabs(watch1.GetSeconds() - 0.5) > 0.05) {
+    if (fabs(watch1.GetSeconds() - 0.5) > FuzzyTime(0.05)) {
         cout << "Sleep for .5 seconds but measured time was "
              << watch1.GetSeconds()
              << " seconds."
@@ -188,7 +196,7 @@ Test_TfStopwatch()
     swatch1.Stop();
 
     // The value of swatch1 should be "near" 0.5 seconds
-    if (fabs(swatch1.GetSeconds() - 0.5) > 0.05) {
+    if (fabs(swatch1.GetSeconds() - 0.5) > FuzzyTime(0.05)) {
         cout << "Sleep for .5 seconds but measured time was "
              << swatch1.GetSeconds()
              << " seconds."
@@ -308,7 +316,7 @@ Test_TfStopwatch()
     
     TfStopwatch pauseWatch = TfStopwatch::GetNamedStopwatch("pwatch");
 
-    if (fabs(pauseWatch.GetSeconds() - 0.5) > 0.05) {
+    if (fabs(pauseWatch.GetSeconds() - 0.5) > FuzzyTime(0.05)) {
         cout << "pause for .5 seconds but measured time was "
              << pauseWatch.GetSeconds()
              << " seconds."
