@@ -30,6 +30,7 @@ branches:
   only:
     - master
     - dev
+    - travis
 
 addons: &linux_addons
   apt:
