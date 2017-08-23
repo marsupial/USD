@@ -38,7 +38,7 @@ Garch_GetModifierKeys(NSUInteger flags)
     int keys = 0;
 
     // The 10.12 SDK has new symbols.
-#if MAC_OS_X_VERSION_MAX_ALLOWED < 101200
+#ifndef MAC_OS_X_VERSION_10_12
   #define NSEventModifierFlagShift NSShiftKeyMask
   #define NSEventModifierFlagControl NSControlKeyMask
   #define NSEventModifierFlagOption NSAlternateKeyMask
