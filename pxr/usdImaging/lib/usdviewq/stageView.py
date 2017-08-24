@@ -805,8 +805,15 @@ class StageView(QtOpenGL.QGLWidget):
         if msaa == "1":
             glFormat.setSampleBuffers(True)
             glFormat.setSamples(4)
-        # XXX: for OSX (QT5 required)
-        # glFormat.setProfile(QtOpenGL.QGLFormat.CoreProfile)
+
+        # Qt 4.8 required for OpenGL 3/4 but still not 4.3, so disable hilight
+        qtVers = QtCore.qVersion() if sys.platform == 'darwin' else None
+        self._appleGL4 = qtVers and (qtVers[0] > 4 or \
+                                     qtVers[0] == 4 and qtVers[1] >= 8)
+        if self._appleGL4:
+            glFormat.setVersion(3, 3)
+            glFormat.setProfile(QtOpenGL.QGLFormat.CoreProfile)
+
         super(StageView, self).__init__(glFormat, parent)
 
         self._dataModel = dataModel or StageView.DefaultDataModel()
@@ -1282,7 +1289,7 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = self._dataModel.viewSettings.displayPrimId
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.viewSettings.displayPrimId
-        self._renderParams.highlight = renderSelHighlights
+        self._renderParams.highlight = renderSelHighlights if not self._appleGL4 else False
         self._renderParams.enableHardwareShading = self._dataModel.viewSettings.enableSceneMaterials
 
         pseudoRoot = self._dataModel.stage.GetPseudoRoot()
@@ -1463,8 +1470,9 @@ class StageView(QtOpenGL.QGLWidget):
         GL.glEnableVertexAttribArray(0)
         GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, False, 0, ctypes.c_void_p(0))
 
-        GL.glEnable(GL.GL_LINE_STIPPLE)
-        GL.glLineStipple(2,0xAAAA)
+        if not self._appleGL4:
+          GL.glEnable(GL.GL_LINE_STIPPLE)
+          GL.glLineStipple(2,0xAAAA)
 
         GL.glUseProgram(glslProgram.program)
         matrix = (ctypes.c_float*16).from_buffer_copy(mvpMatrix)
@@ -1479,7 +1487,8 @@ class StageView(QtOpenGL.QGLWidget):
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glUseProgram(0)
 
-        GL.glDisable(GL.GL_LINE_STIPPLE)
+        if not self._appleGL4:
+          GL.glDisable(GL.GL_LINE_STIPPLE)
         if (self._vao != 0):
             GL.glBindVertexArray(0)
 
