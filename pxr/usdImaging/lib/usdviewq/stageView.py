@@ -1374,6 +1374,13 @@ class StageView(QtOpenGL.QGLWidget):
             renderer = None
         self._forceRefresh = False
 
+        from OpenGL import GL
+        err = GL.glGetError()
+        while err != GL.GL_NO_ERROR:
+            from OpenGL.GLU import gluErrorString
+            print 'OpenGL error: ', gluErrorString(err)
+            err = GL.glGetError()
+
 
     def initializeGL(self):
         if not self.isValid():
