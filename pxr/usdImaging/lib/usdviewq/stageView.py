@@ -1300,6 +1300,8 @@ class StageView(QtOpenGL.QGLWidget):
             renderer = None
         self._forceRefresh = False
 
+        from OpenGL import GL
+        GL.glGetError()
 
     def initializeGL(self):
         if not self.isValid():
