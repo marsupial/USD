@@ -124,6 +124,10 @@ class GLSLProgram():
         from OpenGL import GL
         GL.glUniform4f(self.uniformLocations[param], x, y, z, w)
 
+    def __del__(self):
+        if gettr(self, 'program', 0):
+            glDeleteProgram(self.program)
+
 class Rect():
     def __init__(self):
         self.xywh = [0.0] * 4
