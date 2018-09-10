@@ -45,6 +45,8 @@ from selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from viewSettingsDataModel import ViewSettingsDataModel
 from freeCamera import FreeCamera
 
+kGLMajorVersion, kGLShaderVersion = (0,0)
+
 # A viewport rectangle to be used for GL must be integer values.
 # In order to loose the least amount of precision the viewport
 # is centered and adjusted to initially contain entirely the
@@ -82,13 +84,12 @@ def ViewportMakeCenteredIntegral(viewport):
 class GLSLProgram():
     def __init__(self, VS3, FS3, VS2, FS2, uniformDict):
         from OpenGL import GL
-        self._glMajorVersion = int(GL.glGetString(GL.GL_VERSION)[0])
 
         self.program   = GL.glCreateProgram()
         vertexShader   = GL.glCreateShader(GL.GL_VERTEX_SHADER)
         fragmentShader = GL.glCreateShader(GL.GL_FRAGMENT_SHADER)
 
-        if (self._glMajorVersion >= 3):
+        if (kGLMajorVersion >= 3):
             vsSource = VS3
             fsSource = FS3
         else:
@@ -250,11 +251,11 @@ class OutlineRect(Rect):
 
         GL.glUseProgram(program.program)
 
-        if (program._glMajorVersion >= 4):
+        if (kGLMajorVersion >= 4):
             GL.glDisable(GL.GL_SAMPLE_ALPHA_TO_COVERAGE)
 
         # requires PyOpenGL 3.0.2 or later for glGenVertexArrays.
-        if (program._glMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
+        if (kGLMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
             if (cls._vao == 0):
                 cls._vao = GL.glGenVertexArrays(1)
             GL.glBindVertexArray(cls._vao)
@@ -331,11 +332,11 @@ class FilledRect(Rect):
 
         GL.glUseProgram(program.program)
 
-        if (program._glMajorVersion >= 4):
+        if (kGLMajorVersion >= 4):
             GL.glDisable(GL.GL_SAMPLE_ALPHA_TO_COVERAGE)
 
         # requires PyOpenGL 3.0.2 or later for glGenVertexArrays.
-        if (program._glMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
+        if (kGLMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
             if (cls._vao == 0):
                 cls._vao = GL.glGenVertexArrays(1)
             GL.glBindVertexArray(cls._vao)
@@ -473,7 +474,6 @@ class HUD():
         self._HUDFont = QtGui.QFont("Menv Mono Numeric", 9*self._pixelRatio)
         self._groups = {}
         self._glslProgram = None
-        self._glMajorVersion = 0
         self._vao = 0
 
     def compileProgram(self):
@@ -578,11 +578,11 @@ class HUD():
         width = float(qglwidget.width())
         height = float(qglwidget.height())
 
-        if (self._glslProgram._glMajorVersion >= 4):
+        if (kGLMajorVersion >= 4):
             GL.glDisable(GL.GL_SAMPLE_ALPHA_TO_COVERAGE)
 
         # requires PyOpenGL 3.0.2 or later for glGenVertexArrays.
-        if (self._glslProgram._glMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
+        if (kGLMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
             if (self._vao == 0):
                 self._vao = GL.glGenVertexArrays(1)
             GL.glBindVertexArray(self._vao)
@@ -974,7 +974,7 @@ class StageView(QtOpenGL.QGLWidget):
             return
 
         # vao
-        if (glslProgram._glMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
+        if (kGLMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
             if (self._vao == 0):
                 self._vao = GL.glGenVertexArrays(1)
             GL.glBindVertexArray(self._vao)
@@ -1304,6 +1304,13 @@ class StageView(QtOpenGL.QGLWidget):
         if not Glf.GlewInit():
             return
         Glf.RegisterDefaultDebugOutputMessageCallback()
+        from OpenGL import GL
+        self._glRenderVersion = GL.glGetString(GL.GL_VERSION)
+        self._glShaderVersion = GL.glGetString(GL.GL_SHADING_LANGUAGE_VERSION)
+        print '%s\nShader Model: %s' % (self._glRenderVersion, self._glShaderVersion)
+        global kGLMajorVersion, kGLShaderVersion
+        kGLMajorVersion = int(self._glRenderVersion[0])
+        kGLShaderVersion = int(self._glShaderVersion[0])
 
     def updateGL(self):
         """We override this virtual so that we can make it a no-op during
@@ -1424,7 +1431,7 @@ class StageView(QtOpenGL.QGLWidget):
         if (glslProgram.program == 0):
             return
         # vao
-        if (glslProgram._glMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
+        if (kGLMajorVersion >= 3 and hasattr(GL, 'glGenVertexArrays')):
             if (self._vao == 0):
                 self._vao = GL.glGenVertexArrays(1)
             GL.glBindVertexArray(self._vao)
