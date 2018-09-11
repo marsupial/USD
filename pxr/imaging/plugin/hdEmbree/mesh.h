@@ -32,8 +32,8 @@
 
 #include "pxr/imaging/plugin/hdEmbree/meshSamplers.h"
 
-#include <embree2/rtcore.h>
-#include <embree2/rtcore_ray.h>
+#include <embree3/rtcore.h>
+#include <embree3/rtcore_ray.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -185,12 +185,12 @@ private:
                                bool refined);
 
     // Utility function to call rtcNewSubdivisionMesh and populate topology.
-    void _CreateEmbreeSubdivMesh(RTCScene scene);
+    void _CreateEmbreeSubdivMesh(RTCScene scene, RTCDevice device);
     // Utility function to call rtcNewTriangleMesh and populate topology.
-    void _CreateEmbreeTriangleMesh(RTCScene scene);
+    void _CreateEmbreeTriangleMesh(RTCScene scene, RTCDevice device);
 
     // An embree intersection filter callback, for doing backface culling.
-    static void _EmbreeCullFaces(void *userData, RTCRay &ray);
+    static void _EmbreeCullFaces(const RTCFilterFunctionNArguments* args);
 
 private:
     // Every HdEmbreeMesh is treated as instanced; if there's no instancer,

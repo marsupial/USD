@@ -373,7 +373,7 @@ HdEmbreeRenderer::Render(HdRenderThread *renderThread)
     _completedSamples.store(0);
 
     // Commit any pending changes to the scene.
-    rtcCommit(_scene);
+    rtcCommitScene(_scene);
 
     if (!_ValidateAovBindings()) {
         // We aren't going to render anything. Just mark all AOVs as converged
@@ -544,22 +544,22 @@ HdEmbreeRenderer::_RenderTiles(HdRenderThread *renderThread,
 
 /// Fill in an RTCRay structure from the given parameters.
 static void
-_PopulateRay(RTCRay *ray, GfVec3f const& origin, 
+_PopulateRay(RTCRay &ray, GfVec3f const& origin,
              GfVec3f const& dir, float nearest)
 {
-    ray->org[0] = origin[0];
-    ray->org[1] = origin[1];
-    ray->org[2] = origin[2];
-    ray->dir[0] = dir[0];
-    ray->dir[1] = dir[1];
-    ray->dir[2] = dir[2];
-    ray->tnear = nearest; 
-    ray->tfar = std::numeric_limits<float>::infinity();
-    ray->geomID = RTC_INVALID_GEOMETRY_ID;
-    ray->primID = RTC_INVALID_GEOMETRY_ID;
-    ray->mask = -1;
-    ray->time = 0.0f;
+    ray.org_x = origin[0];
+    ray.org_y = origin[1];
+    ray.org_z = origin[2];
+    ray.dir_x = dir[0];
+    ray.dir_y = dir[1];
+    ray.dir_z = dir[2];
+    ray.tnear = nearest;
+    ray.tfar = std::numeric_limits<float>::infinity();
+    ray.mask = -1;
+    ray.time = 0.0f;
 }
+
+
 
 /// Generate a random cosine-weighted direction ray (in the hemisphere
 /// around <0,0,1>).  The input is a pair of uniformly distributed random
@@ -586,9 +586,20 @@ HdEmbreeRenderer::_TraceRay(unsigned int x, unsigned int y,
                             std::default_random_engine &random)
 {
     // Intersect the camera ray.
-    RTCRay ray;
-    _PopulateRay(&ray, origin, dir, 0.0f);
-    rtcIntersect(_scene, ray);
+    RTCRayHit ray; // EMBREE_FIXME: use RTCRay for occlusion rays
+    ray.ray.flags = 0;
+    ray.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    ray.hit.primID = RTC_INVALID_GEOMETRY_ID;
+    _PopulateRay(ray.ray, origin, dir, 0.0f);
+    {
+      RTCIntersectContext context;
+      rtcInitIntersectContext(&context);
+      rtcIntersect1(_scene,&context,&ray);
+      // EMBREE_FIXME: only correct for triangles,quads, and subdivision surfaces
+      ray.hit.Ng_x = -ray.hit.Ng_x;
+      ray.hit.Ng_y = -ray.hit.Ng_y;
+      ray.hit.Ng_z = -ray.hit.Ng_z;
+    }
 
     // Write AOVs to attachments that aren't converged.
     for (size_t i = 0; i < _aovBindings.size(); ++i) {
@@ -638,9 +649,10 @@ HdEmbreeRenderer::_TraceRay(unsigned int x, unsigned int y,
 }
 
 bool
-HdEmbreeRenderer::_ComputeId(RTCRay const& rayHit, TfToken const& idType,
+HdEmbreeRenderer::_ComputeId(RTCRayHit const& rayHitIn, TfToken const& idType,
                              int32_t *id)
 {
+    const RTCHit& rayHit = rayHitIn.hit;
     if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return false;
     }
@@ -648,11 +660,11 @@ HdEmbreeRenderer::_ComputeId(RTCRay const& rayHit, TfToken const& idType,
     // Get the instance and prototype context structures for the hit prim.
     HdEmbreeInstanceContext *instanceContext =
         static_cast<HdEmbreeInstanceContext*>(
-            rtcGetUserData(_scene, rayHit.instID));
+            rtcGetGeometryUserData(rtcGetGeometry(_scene,rayHit.instID[0])));
 
     HdEmbreePrototypeContext *prototypeContext =
         static_cast<HdEmbreePrototypeContext*>(
-            rtcGetUserData(instanceContext->rootScene, rayHit.geomID));
+            rtcGetGeometryUserData(rtcGetGeometry(instanceContext->rootScene,rayHit.geomID)));
 
     if (idType == HdAovTokens->primId) {
         *id = prototypeContext->rprim->GetPrimId();
@@ -673,10 +685,11 @@ HdEmbreeRenderer::_ComputeId(RTCRay const& rayHit, TfToken const& idType,
 }
 
 bool
-HdEmbreeRenderer::_ComputeDepth(RTCRay const& rayHit,
+HdEmbreeRenderer::_ComputeDepth(RTCRayHit const& rayHit,
                                 float *depth,
                                 bool clip)
 {
+    const RTCHit& rayHit = rayHitIn.hit;
     if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return false;
     }
@@ -692,17 +705,18 @@ HdEmbreeRenderer::_ComputeDepth(RTCRay const& rayHit,
         // For the depth range transform, we assume [0,1].
         *depth = (hitPos[2] + 1.0f) / 2.0f;
     } else {
-        *depth = rayHit.tfar;
+        *depth = rayHit.ray.tfar;
     }
     return true;
 }
 
 bool
-HdEmbreeRenderer::_ComputeNormal(RTCRay const& rayHit,
+HdEmbreeRenderer::_ComputeNormal(RTCRayHit const& rayHitIn,
                                  GfVec3f *normal,
                                  bool eye)
 {
-    if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
+    const RTCHit& rayHit = rayHitIn.hit;
+    if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return false;
     }
 
@@ -731,10 +745,11 @@ HdEmbreeRenderer::_ComputeNormal(RTCRay const& rayHit,
 }
 
 bool
-HdEmbreeRenderer::_ComputePrimvar(RTCRay const& rayHit,
+HdEmbreeRenderer::_ComputePrimvar(RTCRayHit const& rayHitIn,
                                   TfToken const& primvar,
                                   GfVec3f *value)
 {
+    const RTCHit& rayHit = rayHitIn.hit;
     if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return false;
     }
@@ -770,10 +785,11 @@ HdEmbreeRenderer::_ComputePrimvar(RTCRay const& rayHit,
 }
 
 GfVec4f
-HdEmbreeRenderer::_ComputeColor(RTCRay const& rayHit,
+HdEmbreeRenderer::_ComputeColor(RTCRayHit const& rayHitIn,
                                 std::default_random_engine &random,
                                 GfVec4f const& clearColor)
 {
+    const RTCHit& rayHit = rayHitIn.hit;
     if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return clearColor;
     }
@@ -781,20 +797,21 @@ HdEmbreeRenderer::_ComputeColor(RTCRay const& rayHit,
     // Get the instance and prototype context structures for the hit prim.
     HdEmbreeInstanceContext *instanceContext =
         static_cast<HdEmbreeInstanceContext*>(
-                rtcGetUserData(_scene, rayHit.instID));
+                rtcGetGeometryUserData(rtcGetGeometry(_scene,rayHit.instID[0])));
 
     HdEmbreePrototypeContext *prototypeContext =
         static_cast<HdEmbreePrototypeContext*>(
-                rtcGetUserData(instanceContext->rootScene, rayHit.geomID));
+                rtcGetGeometryUserData(rtcGetGeometry(instanceContext->rootScene,rayHit.geomID)));
 
     // Compute the worldspace location of the rayHit hit.
-    GfVec3f hitPos = GfVec3f(rayHit.org[0] + rayHit.tfar * rayHit.dir[0],
-            rayHit.org[1] + rayHit.tfar * rayHit.dir[1],
-            rayHit.org[2] + rayHit.tfar * rayHit.dir[2]);
+    const RTCRay& ray = rayHitIn.ray;
+    GfVec3f hitPos = GfVec3f(ray.org_x + ray.tfar * ray.dir_x,
+            ray.org_y + ray.tfar * ray.dir_y,
+            ray.org_y + ray.tfar * ray.dir_z);
 
     // If a normal primvar is present (e.g. from smooth shading), use that
     // for shading; otherwise use the flat face normal.
-    GfVec3f normal = -GfVec3f(rayHit.Ng[0], rayHit.Ng[1], rayHit.Ng[2]);
+    GfVec3f normal = -GfVec3f(rayHit.Ng_x, rayHit.Ng_y, rayHit.Ng_z);
     if (prototypeContext->primvarMap.count(HdTokens->normals) > 0) {
         prototypeContext->primvarMap[HdTokens->normals]->Sample(
                 rayHit.primID, rayHit.u, rayHit.v, &normal);
@@ -817,7 +834,7 @@ HdEmbreeRenderer::_ComputeColor(RTCRay const& rayHit,
 
     // Lighting model: (camera dot normal), i.e. diffuse-only point light
     // centered on the camera.
-    GfVec3f dir = GfVec3f(rayHit.dir[0], rayHit.dir[1], rayHit.dir[2]);
+    GfVec3f dir = GfVec3f(ray.dir_x, ray.dir_y, ray.dir_z);
     float diffuseLight = fabs(GfDot(-dir, normal)) *
         HdEmbreeConfig::GetInstance().cameraLightIntensity;
 
@@ -898,13 +915,19 @@ HdEmbreeRenderer::_ComputeAmbientOcclusion(GfVec3f const& position,
 
         // Trace shadow ray, using the fast interface (rtcOccluded) since
         // we only care about intersection status, not intersection id.
-        RTCRay shadow;
-        _PopulateRay(&shadow, position, shadowDir, 0.001f);
-        rtcOccluded(_scene, shadow);
+        RTCRay shadow; // EMBREE_FIXME: use RTCRay for occlusion rays
+        shadow.flags = 0;
+        _PopulateRay(shadow, position, shadowDir, 0.001f);
+        {
+          RTCIntersectContext context;
+          rtcInitIntersectContext(&context);
+          rtcOccluded1(_scene,&context,&shadow);
+          // EMBREE_FIXME: shadow is occluded when shadow.ray.tfar < 0.0f
+        }
 
         // Record this AO ray's contribution to the occlusion factor: a
         // boolean [In shadow/Not in shadow].
-        if (shadow.geomID == RTC_INVALID_GEOMETRY_ID)
+        if (shadow.tfar >= 0.0f)
             occlusionFactor += GfDot(shadowDir, normal);
     }
     // Compute the average of the occlusion samples.

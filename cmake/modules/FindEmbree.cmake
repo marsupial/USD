@@ -37,7 +37,7 @@
 #=============================================================================
 
 if (APPLE)
-    set (EMBREE_LIB_NAME libembree.dylib)
+    set (EMBREE_LIB_NAME libembree3.dylib)
 elseif (UNIX)
     set (EMBREE_LIB_NAME libembree.so)
 elseif (WIN32)
@@ -56,20 +56,20 @@ find_library(EMBREE_LIBRARY
 )
 
 find_path(EMBREE_INCLUDE_DIR
-    embree2/rtcore.h
+    embree3/rtcore.h
 HINTS
     "${EMBREE_LOCATION}/include"
     "$ENV{EMBREE_LOCATION}/include"
 DOC
     "Embree headers path"
 )
-
-if (EMBREE_INCLUDE_DIR AND EXISTS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" )
-    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_MAJOR.*$")
+set(EMBREE_INCLUDE_DIR "/Users/jermainedupris/Downloads/buildbot-osx/include/embree3")
+if (EMBREE_INCLUDE_DIR AND EXISTS "${EMBREE_INCLUDE_DIR}/embree3/rtcore_version.h" )
+    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree3/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_MAJOR.*$")
     string(REGEX MATCHALL "[0-9]+" MAJOR ${TMP})
-    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_MINOR.*$")
+    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree3/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_MINOR.*$")
     string(REGEX MATCHALL "[0-9]+" MINOR ${TMP})
-    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_PATCH.*$")
+    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree3/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_PATCH.*$")
     string(REGEX MATCHALL "[0-9]+" PATCH ${TMP})
 
     set (EMBREE_VERSION ${MAJOR}.${MINOR}.${PATCH})

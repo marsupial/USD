@@ -37,7 +37,7 @@ HdEmbreeRTCBufferAllocator::Allocate()
         if (!_bitset.test(i)) {
             _bitset.set(i);
             return static_cast<RTCBufferType>(
-                static_cast<size_t>(RTC_USER_VERTEX_BUFFER) + i);
+                static_cast<size_t>(RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE) + i);
         }
     }
     return static_cast<RTCBufferType>(-1);
@@ -46,7 +46,7 @@ HdEmbreeRTCBufferAllocator::Allocate()
 void
 HdEmbreeRTCBufferAllocator::Free(RTCBufferType buffer)
 {
-    _bitset.reset(buffer - RTC_USER_VERTEX_BUFFER);
+    _bitset.reset(buffer - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE);
 }
 
 // HdEmbreeConstantSampler
@@ -161,15 +161,32 @@ HdEmbreeSubdivVertexSampler::HdEmbreeSubdivVertexSampler(TfToken const& name,
     // count), shared between vertex and face-varying modes.
     if (_embreeBufferId == static_cast<RTCBufferType>(-1)) {
         TF_CODING_ERROR("Embree subdivision meshes only support %d primvars"
-            " in vertex interpolation mode", RTC_MAX_USER_VERTEX_BUFFERS);
+            " in vertex interpolation mode", 65536);
         return;
     }
     // Tag the embree mesh object with the primvar buffer, for use by
     // rtcInterpolate.
+
+    rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
+    _embreeBufferId,
+    0, // EMBREE_FIXME_COULD_NOT_INFER_SLOT,
+    RTC_FORMAT_FLOAT,
+    _buffer.GetData(),0,
+    HdDataSizeOfTupleType(_buffer.GetTupleType()),
+    _buffer.GetNumElements());
+
+#if 0
     rtcSetBuffer(_meshScene, _meshId, _embreeBufferId,
         _buffer.GetData(),
         /* offset */ 0,
         /* stride */ HdDataSizeOfTupleType(_buffer.GetTupleType()));
+
+
+RTCORE_API void rtcSetBuffer(RTCScene scene, unsigned geomID, RTCBufferType type,
+                             const void* ptr, size_t byteOffset, size_t byteStride);
+RTC_API void rtcSetSharedGeometryBuffer(RTCGeometry geometry, enum RTCBufferType type,
+unsigned int slot, enum RTCFormat format, const void* ptr, size_t byteOffset, size_t byteStride, size_t itemCount);
+#endif
 }
 
 HdEmbreeSubdivVertexSampler::~HdEmbreeSubdivVertexSampler()
@@ -193,8 +210,11 @@ HdEmbreeSubdivVertexSampler::Sample(unsigned int element, float u, float v,
     // Combine number of components in the underlying type and tuple arity.
     size_t numFloats = HdGetComponentCount(dataType.type) * dataType.count;
 
-    rtcInterpolate(_meshScene, _meshId, element, u, v, _embreeBufferId,
-        static_cast<float*>(value), nullptr, nullptr, numFloats);
+    rtcInterpolate1(rtcGetGeometry(_meshScene,_meshId),element,u,v,
+                    _embreeBufferId,
+                    0, // EMBREE_FIXME_COULD_NOT_INFER_SLOT,
+                    static_cast<float*>(value),nullptr,nullptr,numFloats);
+
     return true;
 }
 
