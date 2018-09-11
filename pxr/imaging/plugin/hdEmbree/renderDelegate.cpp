@@ -65,27 +65,26 @@ std::atomic_int HdEmbreeRenderDelegate::_counterResourceRegistry;
 HdResourceRegistrySharedPtr HdEmbreeRenderDelegate::_resourceRegistry;
 
 /* static */
-void
-HdEmbreeRenderDelegate::HandleRtcError(const RTCError code, const char* msg)
+void HdEmbreeRenderDelegate::HandleRtcError (void* userPtr, RTCError code, const char* msg)
 {
     // Forward RTC error messages through to hydra logging.
     switch (code) {
-        case RTC_UNKNOWN_ERROR:
+        case RTC_ERROR_UNKNOWN:
             TF_CODING_ERROR("Embree unknown error: %s", msg);
             break;
-        case RTC_INVALID_ARGUMENT:
+        case RTC_ERROR_INVALID_ARGUMENT:
             TF_CODING_ERROR("Embree invalid argument: %s", msg);
             break;
-        case RTC_INVALID_OPERATION:
+        case RTC_ERROR_INVALID_OPERATION:
             TF_CODING_ERROR("Embree invalid operation: %s", msg);
             break;
-        case RTC_OUT_OF_MEMORY:
+        case RTC_ERROR_OUT_OF_MEMORY:
             TF_CODING_ERROR("Embree out of memory: %s", msg);
             break;
-        case RTC_UNSUPPORTED_CPU:
+        case RTC_ERROR_UNSUPPORTED_CPU:
             TF_CODING_ERROR("Embree unsupported CPU: %s", msg);
             break;
-        case RTC_CANCELLED:
+        case RTC_ERROR_CANCELLED:
             TF_CODING_ERROR("Embree cancelled: %s", msg);
             break;
         default:
@@ -137,14 +136,13 @@ HdEmbreeRenderDelegate::_Initialize()
     _rtcDevice = rtcNewDevice(nullptr);
 
     // Register our error message callback.
-    rtcDeviceSetErrorFunction(_rtcDevice, HandleRtcError);
+    rtcSetDeviceErrorFunction(_rtcDevice,HandleRtcError,NULL);
 
     // Embree has an internal cache for subdivision surface computations.
     // HdEmbree exposes the size as an environment variable.
     unsigned int subdivisionCache =
         HdEmbreeConfig::GetInstance().subdivisionCache;
-    rtcDeviceSetParameter1i(_rtcDevice, RTC_SOFTWARE_CACHE_SIZE,
-        subdivisionCache);
+    // rtcSetDeviceProperty (_rtcDevice,,subdivisionCache) // EMBREE_FIXME: not supported;
 
     // Create the top-level scene.
     //
@@ -154,8 +152,9 @@ HdEmbreeRenderDelegate::_Initialize()
     // and querying them with rtcInterpolate.
     //
     // XXX: Investigate ray packets.
-    _rtcScene = rtcDeviceNewScene(_rtcDevice, RTC_SCENE_DYNAMIC,
-        RTC_INTERSECT1 | RTC_INTERPOLATE);
+    _rtcScene = rtcNewScene(_rtcDevice);
+    // rtcSetSceneFlags(_rtcScene,RTC_SCENE_FLAG_DYNAMIC | RTC_BUILD_QUALITY_LOW); // EMBREE_FIXME: set proper scene flags
+    // rtcSetSceneBuildQuality(_rtcScene,RTC_SCENE_FLAG_DYNAMIC | RTC_BUILD_QUALITY_LOW); // EMBREE_FIXME: set proper build quality
 
     // Store top-level embree objects inside a render param that can be
     // passed to prims during Sync(). Also pass a handle to the render thread.
@@ -194,8 +193,8 @@ HdEmbreeRenderDelegate::~HdEmbreeRenderDelegate()
 
     // Destroy embree library and scene state.
     _renderParam.reset();
-    rtcDeleteScene(_rtcScene);
-    rtcDeleteDevice(_rtcDevice);
+    rtcReleaseScene(_rtcScene);
+    rtcReleaseDevice (_rtcDevice);
 }
 
 HdRenderSettingDescriptorList
