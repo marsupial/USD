@@ -268,7 +268,7 @@ private:
             primIdColor[0] = ((float)((primId & 0x000000ff) >>  0)) / 255.0f;
             primIdColor[1] = ((float)((primId & 0x0000ff00) >>  8)) / 255.0f;
             primIdColor[2] = ((float)((primId & 0x00ff0000) >> 16)) / 255.0f;
-            primIdColor[3] = 1;
+            primIdColor[3] = ((float)((primId & 0xff000000) >> 24)) / 255.0f;
 
             return primIdColor;
         }
