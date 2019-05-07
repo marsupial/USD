@@ -47,6 +47,8 @@ TF_DEFINE_ENV_SETTING(GLF_ENABLE_BINDLESS_TEXTURE, false,
                       "Use GL bindless texture extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_MULTI_DRAW_INDIRECT, true,
                       "Use GL multi draw indirect extention");
+TF_DEFINE_ENV_SETTING(GLF_ENABLE_DRAW_INDIRECT, true,
+                      "Use GL draw indirect extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_DIRECT_STATE_ACCESS, true,
                       "Use GL direct state access extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_COPY_BUFFER, true,
@@ -81,6 +83,7 @@ GlfContextCaps::GlfContextCaps()
     , bufferStorageEnabled(false)
     , directStateAccessEnabled(false)
     , multiDrawIndirectEnabled(false)
+    , drawIndirectEnabled(false)
     , bindlessTextureEnabled(false)
     , bindlessBufferEnabled(false)
 
@@ -145,6 +148,7 @@ GlfContextCaps::_LoadCaps()
     bufferStorageEnabled         = false;
     directStateAccessEnabled     = false;
     multiDrawIndirectEnabled     = false;
+    drawIndirectEnabled          = false;
     bindlessTextureEnabled       = false;
     bindlessBufferEnabled        = false;
     glslVersion                  = _DefaultGLSLVersion;
@@ -215,6 +219,7 @@ GlfContextCaps::_LoadCaps()
         // Older versions of GL maybe support R16F and D32F, but for now we set
         // the minimum GL at 4.
         floatingPointBuffersEnabled = true;
+        drawIndirectEnabled = true;
     }
     if (glVersion >= 420) {
         shadingLanguage420pack = true;
@@ -252,6 +257,9 @@ GlfContextCaps::_LoadCaps()
     if (GLEW_ARB_multi_draw_indirect) {
         multiDrawIndirectEnabled = true;
     }
+    if (GLEW_ARB_draw_indirect) {
+        drawIndirectEnabled = true;
+    }
 #if defined(GLEW_VERSION_4_5)  // glew 1.11 or newer (usd requirement is 1.10)
     if (GLEW_ARB_direct_state_access) {
         directStateAccessEnabled = true;
@@ -276,6 +284,9 @@ GlfContextCaps::_LoadCaps()
     }
     if (!TfGetEnvSetting(GLF_ENABLE_MULTI_DRAW_INDIRECT)) {
         multiDrawIndirectEnabled = false;
+    }
+    if (!TfGetEnvSetting(GLF_ENABLE_DRAW_INDIRECT)) {
+        drawIndirectEnabled = false;
     }
     if (!TfGetEnvSetting(GLF_ENABLE_DIRECT_STATE_ACCESS)) {
         directStateAccessEnabled = false;
@@ -329,6 +340,8 @@ GlfContextCaps::_LoadCaps()
             <<    explicitUniformLocation << "\n"
             << "  ARB_multi_draw_indirect            = "
             <<    multiDrawIndirectEnabled << "\n"
+            << "  ARB_draw_indirect                  = "
+            <<    drawIndirectEnabled << "\n"
             << "  ARB_shader_draw_parameters   = "
             <<    shaderDrawParametersEnabled << "\n"
             << "  ARB_shader_storage_buffer_object   = "

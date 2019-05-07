@@ -49,7 +49,8 @@ typedef std::vector<HdBindingRequest> HdBindingRequestVector;
 class HdSt_IndirectDrawBatch : public HdSt_DrawBatch {
 public:
     HDST_API
-    HdSt_IndirectDrawBatch(HdStDrawItemInstance * drawItemInstance);
+    HdSt_IndirectDrawBatch(HdStDrawItemInstance * drawItemInstance,
+                           bool                   multiDraw);
     HDST_API
     ~HdSt_IndirectDrawBatch();
 
@@ -167,6 +168,7 @@ private:
     bool _useInstancing;
     bool _useGpuCulling;
     bool _useGpuInstanceCulling;
+    bool _useMultiDraw;
 
     int _instanceCountOffset;
     int _cullInstanceCountOffset;

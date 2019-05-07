@@ -105,6 +105,7 @@ public:
     bool bufferStorageEnabled;        // ARB_buffer_storage               (4.4)
     bool directStateAccessEnabled;    // ARB_direct_state_access          (4.5)
     bool multiDrawIndirectEnabled;    // ARB_multi_draw_indirect          (4.5)
+    bool drawIndirectEnabled;         // ARB_draw_indirect                (4.1)
 
     bool bindlessTextureEnabled;      // ARB_bindless_texture
     bool bindlessBufferEnabled;       // NV_shader_buffer_load

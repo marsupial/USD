@@ -85,7 +85,8 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
                       "Enable GPU per-instance frustum culling");
 
 HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
-    HdStDrawItemInstance * drawItemInstance)
+    HdStDrawItemInstance * drawItemInstance,
+    bool                   mulitDraw)
     : HdSt_DrawBatch(drawItemInstance)
     , _drawCommandBufferDirty(false)
     , _bufferArraysHash(0)
@@ -101,7 +102,7 @@ HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
     , _useInstancing(false)
     , _useGpuCulling(false)
     , _useGpuInstanceCulling(false)
-
+    , _useMultiDraw(mulitDraw)
     , _instanceCountOffset(0)
     , _cullInstanceCountOffset(0)
     , _cullResultSync(0)
@@ -1251,12 +1252,22 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
-        glMultiDrawElementsIndirect(
-            program.GetGeometricShader()->GetPrimitiveMode(),
-            GL_UNSIGNED_INT,
-            0, // draw command always starts with 0
-            batchCount,
-            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+        if (_useMultiDraw) {
+            glMultiDrawElementsIndirect(
+                program.GetGeometricShader()->GetPrimitiveMode(),
+                GL_UNSIGNED_INT,
+                0, // draw command always starts with 0
+                batchCount,
+                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+        } else {
+            const size_t nuints = _dispatchBuffer->GetCommandNumUints();
+            const GLuint mode = program.GetGeometricShader()->GetPrimitiveMode();
+            for (size_t offset = 0, end = _drawCommandBuffer.size();
+                 offset < end; offset += nuints) {
+                glDrawElementsIndirect(mode, GL_UNSIGNED_INT,
+                                       (const void*)(offset*sizeof(GLuint)));
+            }
+        }
     }
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);
