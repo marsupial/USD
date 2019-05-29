@@ -5,6 +5,10 @@ if(NOT PXR_ENABLE_OSL_SUPPORT)
     return()
 endif()
 
+if (NOT OIIO_LIBRARIES)
+  set(OIIO_LIBRARIES /Volumes/Feets/Developer/build/buildbot/lib/libOpenImageIO.dylib)
+endif()
+
 pxr_plugin(sdrOsl
     LIBRARIES
         gf
