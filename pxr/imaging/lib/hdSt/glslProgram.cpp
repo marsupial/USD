@@ -134,7 +134,7 @@ HdStGLSLProgram::CompileShader(GLenum type,
     glCompileShader(shader);
 
     std::string fname;
-    if (TfDebug::IsEnabled(HDST_DUMP_SHADER_SOURCEFILE)) {
+    if (1) { //}(TfDebug::IsEnabled(HDST_DUMP_SHADER_SOURCEFILE)) {
         std::stringstream fnameStream;
         static size_t debugShaderID = 0;
         fnameStream << "program" << _debugID << "_shader" << debugShaderID++

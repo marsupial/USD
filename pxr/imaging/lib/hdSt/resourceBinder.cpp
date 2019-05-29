@@ -38,6 +38,7 @@
 #include "pxr/base/tf/staticTokens.h"
 
 #include <boost/functional/hash.hpp>
+#include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -151,7 +152,9 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
         = GlfContextCaps::GetInstance().bindlessBufferEnabled;
     const bool bindlessTextureEnabled
         = GlfContextCaps::GetInstance().bindlessTextureEnabled;
-
+	std::cout << "ssboEnabled : " << ssboEnabled << '\n'
+		      << "bindlessUniformEnabled : " << bindlessUniformEnabled << '\n'
+			  << "bindlessTextureEnabled : " << bindlessTextureEnabled << '\n';
     HdBinding::Type arrayBufferBindingType = HdBinding::TBO;  // 3.0
     if (bindlessUniformEnabled) {
         arrayBufferBindingType = HdBinding::BINDLESS_UNIFORM; // EXT

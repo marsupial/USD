@@ -434,7 +434,11 @@ namespace {
             }
             break;
         case HdBinding::SSBO:
+#ifndef __APPLE__
             out << "layout (std430, binding = " << location << ") ";
+#else
+            out << "layout (std140) ";
+#endif
             break;
         case HdBinding::UBO:
             if (caps.shadingLanguage420pack) {
@@ -1055,7 +1059,12 @@ static void _EmitDeclaration(std::stringstream &str,
         str << "};\n";
         break;
     case HdBinding::SSBO:
-        str << "buffer buffer_" << binding.GetLocation() << " {\n"
+#ifndef __APPLE__
+        str << "buffer"
+#else
+        str << "uniform"
+#endif
+		    << " buffer_" << binding.GetLocation() << " {\n"
             << "  " << _GetPackedType(type, true)
             << " " << name << "[];\n"
             << "};\n";
