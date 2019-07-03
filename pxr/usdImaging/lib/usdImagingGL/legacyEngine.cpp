@@ -239,7 +239,7 @@ UsdImagingGLLegacyEngine::_DrawPolygons(bool drawID)
         offset += sizeof(GLfloat) * (_colors.size() + 
                                      _linePoints.size() + 
                                      _lineColors.size());
-    glColorPointer(4, GL_FLOAT, 0, (GLvoid*)offset);
+    glColorPointer(drawID ? 4 : 3, GL_FLOAT, 0, (GLvoid*)offset);
 
     if (!_SupportsPrimitiveRestartIndex()) {
         glMultiDrawElements(GL_POLYGON,
@@ -273,7 +273,8 @@ UsdImagingGLLegacyEngine::_DrawLines(bool drawID)
     offset += sizeof(GLfloat) * _linePoints.size();
     if (drawID)
         offset += sizeof(GLfloat) * (_lineColors.size() + _IDColors.size());
-    glColorPointer(4, GL_FLOAT, 0, (GLvoid*)offset);
+    glColorPointer(drawID ? 4 : 3, GL_FLOAT, 0, (GLvoid*)offset);
+
 
     if (!_SupportsPrimitiveRestartIndex()) {
         glMultiDrawElements(GL_LINE_STRIP,

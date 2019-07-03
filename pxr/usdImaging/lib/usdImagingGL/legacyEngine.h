@@ -170,6 +170,7 @@ private:
         vec->push_back(ID[0]);
         vec->push_back(ID[1]);
         vec->push_back(ID[2]);
+        vec->push_back(ID[3]);
     }
 
     // USD Change notice handler.
