@@ -131,7 +131,7 @@ HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
     //       if we decide always to use instance culling instead of XFB.
     _useGpuInstanceCulling = _useInstancing &&
         _useGpuCulling && IsEnabledGPUInstanceFrustumCulling();
-
+printf("_useGpuCulling %d\n", _useGpuCulling);
     if (_useGpuCulling) {
         _cullingProgram.Initialize(
             _useDrawArrays, _useGpuInstanceCulling, _bufferArraysHash);
@@ -1218,7 +1218,7 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     HdStBufferArrayRangeGLSharedPtr dispatchBar =
         _dispatchBuffer->GetBufferArrayRange();
     binder.BindBufferArray(dispatchBar);
-
+_dispatchBuffer->DebugDump(std::cerr);
     // update geometric shader states
     program.GetGeometricShader()->BindResources(binder, programId);
 
@@ -1235,7 +1235,7 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
                program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
-
+printf("glMultiDrawArraysIndirect\n");
         glMultiDrawArraysIndirect(
             program.GetGeometricShader()->GetPrimitiveMode(),
             0, // draw command always starts with 0
@@ -1253,17 +1253,19 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
         if (_useMultiDraw) {
+printf("glMultiDrawElementsIndirect\n");
             glMultiDrawElementsIndirect(
                 program.GetGeometricShader()->GetPrimitiveMode(),
                 GL_UNSIGNED_INT,
                 0, // draw command always starts with 0
                 batchCount,
                 _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
-        } else {
+        } else if (1){
             const size_t nuints = _dispatchBuffer->GetCommandNumUints();
             const GLuint mode = program.GetGeometricShader()->GetPrimitiveMode();
             for (size_t offset = 0, end = _drawCommandBuffer.size();
                  offset < end; offset += nuints) {
+                printf("glDrawElementsIndirect %lu of %lu %lu\n", offset, _drawCommandBuffer.size(), batchCount);
                 glDrawElementsIndirect(mode, GL_UNSIGNED_INT,
                                        (const void*)(offset*sizeof(GLuint)));
             }
