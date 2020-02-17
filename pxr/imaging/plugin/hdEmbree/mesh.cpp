@@ -209,6 +209,21 @@ void HdEmbreeMesh::_EmbreeCullFaces(const RTCFilterFunctionNArguments* args)
     }
 }
 
+std::pair<unsigned, RTCGeometry>
+createRTObject(RTCDevice device, RTCScene scene, RTCGeometryType type, RTCBuildQuality quality = RTC_BUILD_QUALITY_REFIT, unsigned timeCount = 1)
+{
+    RTCGeometry geometry = rtcNewGeometry (device, type);
+    rtcSetGeometryBuildQuality(geometry, quality);
+    rtcSetGeometryTimeStepCount(geometry, timeCount);
+    unsigned geoID = rtcAttachGeometry(scene, geometry);
+    if (geoID != RTC_INVALID_GEOMETRY_ID)
+        return { geoID, geometry };
+
+    TF_CODING_ERROR("Couldn't attach RTC geometry: %d", type);
+    rtcReleaseGeometry(geometry);
+    return { RTC_INVALID_GEOMETRY_ID, nullptr };
+}
+
 void
 HdEmbreeMesh::_CreateEmbreeSubdivMesh(RTCScene scene, RTCDevice device)
 {
@@ -248,22 +263,22 @@ HdEmbreeMesh::_CreateEmbreeSubdivMesh(RTCScene scene, RTCDevice device)
     // EMBREE_FIXME: check if geometry gets properly committed
     if (_rtcMeshId != RTC_INVALID_GEOMETRY_ID)
         rtcDetachGeometry(scene, _rtcMeshId);
-    RTCGeometry geom_2 = rtcNewGeometry (device, RTC_GEOMETRY_TYPE_SUBDIVISION);
-    rtcSetGeometryBuildQuality(geom_2,RTC_BUILD_QUALITY_REFIT);
-    rtcSetGeometryTimeStepCount(geom_2,1);
-    _rtcMeshId = rtcAttachGeometry(scene,geom_2);
-    rtcReleaseGeometry(geom_2);
+
+    RTCGeometry geometry;
+    std::tie(_rtcMeshId, geometry) = createRTObject(device, scene, RTC_GEOMETRY_TYPE_SUBDIVISION);
+    if (_rtcMeshId == RTC_INVALID_GEOMETRY_ID)
+        return;
 
     // Fill the topology buffers.
-    rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_FACE,0,RTC_FORMAT_UINT,_topology.GetFaceVertexCounts().cdata(),0,sizeof(int),_topology.GetFaceVertexCounts().size());
-    rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT,_topology.GetFaceVertexIndices().cdata(),0,sizeof(int),_topology.GetFaceVertexIndices().size());
+    rtcSetSharedGeometryBuffer(geometry,RTC_BUFFER_TYPE_FACE,0,RTC_FORMAT_UINT,_topology.GetFaceVertexCounts().cdata(),0,sizeof(int),_topology.GetFaceVertexCounts().size());
+    rtcSetSharedGeometryBuffer(geometry,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT,_topology.GetFaceVertexIndices().cdata(),0,sizeof(int),_topology.GetFaceVertexIndices().size());
     if (const size_t nHoles = _topology.GetHoleIndices().size())
-        rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_HOLE,0,RTC_FORMAT_UINT, _topology.GetHoleIndices().cdata(), 0, sizeof(int), nHoles);
+        rtcSetSharedGeometryBuffer(geometry,RTC_BUFFER_TYPE_HOLE,0,RTC_FORMAT_UINT, _topology.GetHoleIndices().cdata(), 0, sizeof(int), nHoles);
     
     // If this topology has edge creases, unroll the edge crease buffer.
     if (numEdgeCreases > 0) {
-        int *embreeCreaseIndices = static_cast<int*>(rtcSetNewGeometryBuffer(geom_2,RTC_BUFFER_TYPE_EDGE_CREASE_INDEX,0,RTC_FORMAT_UINT2,2*sizeof(int),numEdgeCreases));
-        float *embreeCreaseWeights = static_cast<float*>(rtcSetNewGeometryBuffer(geom_2,RTC_BUFFER_TYPE_EDGE_CREASE_WEIGHT,0,RTC_FORMAT_FLOAT,sizeof(float),numEdgeCreases));
+        int *embreeCreaseIndices = static_cast<int*>(rtcSetNewGeometryBuffer(geometry,RTC_BUFFER_TYPE_EDGE_CREASE_INDEX,0,RTC_FORMAT_UINT2,2*sizeof(int),numEdgeCreases));
+        float *embreeCreaseWeights = static_cast<float*>(rtcSetNewGeometryBuffer(geometry,RTC_BUFFER_TYPE_EDGE_CREASE_WEIGHT,0,RTC_FORMAT_FLOAT,sizeof(float),numEdgeCreases));
         int embreeEdgeIndex = 0;
 
         VtIntArray const creaseIndices = subdivTags.GetCreaseIndices();
@@ -293,15 +308,14 @@ HdEmbreeMesh::_CreateEmbreeSubdivMesh(RTCScene scene, RTCDevice device)
             }
             creaseIndexStart += creaseLengths[i];
         }
-
-        
-        
     }
 
     if (numVertexCreases > 0) {
-        rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_VERTEX_CREASE_INDEX,0,RTC_FORMAT_UINT,subdivTags.GetCornerIndices().cdata(),0,sizeof(int),numVertexCreases);
-        rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_VERTEX_CREASE_WEIGHT,0,RTC_FORMAT_FLOAT,subdivTags.GetCornerWeights().cdata(),0,sizeof(float),numVertexCreases);
+        rtcSetSharedGeometryBuffer(geometry,RTC_BUFFER_TYPE_VERTEX_CREASE_INDEX,0,RTC_FORMAT_UINT,subdivTags.GetCornerIndices().cdata(),0,sizeof(int),numVertexCreases);
+        rtcSetSharedGeometryBuffer(geometry,RTC_BUFFER_TYPE_VERTEX_CREASE_WEIGHT,0,RTC_FORMAT_FLOAT,subdivTags.GetCornerWeights().cdata(),0,sizeof(float),numVertexCreases);
     }
+
+    rtcReleaseGeometry(geometry);
 }
 
 void
@@ -316,19 +330,15 @@ HdEmbreeMesh::_CreateEmbreeTriangleMesh(RTCScene scene, RTCDevice device)
     // EMBREE_FIXME: check if geometry gets properly committed
     if (_rtcMeshId != RTC_INVALID_GEOMETRY_ID)
         rtcDetachGeometry(scene, _rtcMeshId);
-    RTCGeometry geom_1 = rtcNewGeometry (device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    rtcSetGeometryBuildQuality(geom_1,RTC_BUILD_QUALITY_REFIT);
-    rtcSetGeometryTimeStepCount(geom_1,1);
-    _rtcMeshId = rtcAttachGeometry(scene,geom_1);
-    rtcReleaseGeometry(geom_1);
-    if (_rtcMeshId == RTC_INVALID_GEOMETRY_ID) {
-        TF_CODING_ERROR("Couldn't create RTC mesh");
-        rtcCommitGeometry(geom_1);
-        return ;
-    }
+
+    RTCGeometry geometry;
+    std::tie(_rtcMeshId, geometry) = createRTObject(device, scene, RTC_GEOMETRY_TYPE_TRIANGLE);
+    if (_rtcMeshId == RTC_INVALID_GEOMETRY_ID)
+        return;
 
     // Populate topology.
-    rtcSetSharedGeometryBuffer(geom_1,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT3,_triangulatedIndices.cdata(),0,sizeof(GfVec3i),_triangulatedIndices.size());
+    rtcSetSharedGeometryBuffer(geometry,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT3,_triangulatedIndices.cdata(),0,sizeof(GfVec3i),_triangulatedIndices.size());
+    rtcReleaseGeometry(geometry);
 }
 
 void
