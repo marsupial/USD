@@ -34,11 +34,6 @@
 
 #include <bitset>
 
-// Old versions of embree didn't define this, and had 2 hardcoded user buffers.
-#ifndef RTC_MAX_USER_VERTEX_BUFFERS
-#define RTC_MAX_USER_VERTEX_BUFFERS 2
-#endif
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdEmbreeRTCBufferAllocator
@@ -48,20 +43,24 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdEmbreeRTCBufferAllocator
 {
 public:
-    /// Constructor. By default, set everything to unallocated. 
-    HdEmbreeRTCBufferAllocator()
-        : _bitset(0) {}
-
-    /// Allocate a buffer by finding the first clear bit, using that as
-    /// the buffer number, and setting the bit to mark it as used.
-    /// \return An unused RTC user vertex buffer id, or -1 on failure.
-    RTCBufferType Allocate();
-
-    /// Free a buffer by clearing its bit.
+    using value_type = uint16_t;
+    enum { Invalid = -1 };
+    
+    /// Allocate a buffer.
+    /// \return An unused RTC user vertex buffer id, or Invalid on failure.
+    value_type Allocate();
+    
+    /// Free a buffer
     /// \param buffer The buffer to mark as unused.
-    void Free(RTCBufferType buffer);
+    void Free(value_type buffer);
+
+    ///
+    /// \return The number of used vertex buffers.
+    unsigned Slots() const;
+
 private:
-    std::bitset<RTC_MAX_USER_VERTEX_BUFFERS> _bitset;
+    std::unordered_set<value_type> _available;
+    value_type _next = 0;
 };
 
 // ----------------------------------------------------------------------
@@ -82,9 +81,9 @@ public:
     /// \param value The buffer data for the primvar.
     HdEmbreeConstantSampler(TfToken const& name,
                             VtValue const& value)
-        : _buffer(name, value)
-        , _sampler(_buffer) {}
-
+    : _buffer(name, value)
+    , _sampler(_buffer) {}
+    
     /// Sample the primvar at an (element, u, v) location. For constant
     /// primvars, the buffer only contains one item, so we always return
     /// that item.
@@ -96,7 +95,7 @@ public:
     /// \return True if the value was successfully sampled.
     virtual bool Sample(unsigned int element, float u, float v, void* value,
                         HdTupleType dataType) const;
-
+    
 private:
     HdVtBufferSource const _buffer;
     HdEmbreeBufferSampler const _sampler;
@@ -121,18 +120,18 @@ public:
     HdEmbreeUniformSampler(TfToken const& name,
                            VtValue const& value,
                            VtIntArray const& primitiveParams)
-        : _buffer(name, value)
-        , _sampler(_buffer)
-        , _primitiveParams(primitiveParams) {}
-
+    : _buffer(name, value)
+    , _sampler(_buffer)
+    , _primitiveParams(primitiveParams) {}
+    
     /// Constructor.
     /// \param name The name of the primvar.
     /// \param value The buffer data for the primvar.
     HdEmbreeUniformSampler(TfToken const& name,
                            VtValue const& value)
-        : _buffer(name, value)
-        , _sampler(_buffer) {}
-
+    : _buffer(name, value)
+    , _sampler(_buffer) {}
+    
     /// Sample the primvar at an (element, u, v) location. For uniform
     /// primvars, optionally look up the authored face index in
     /// _primitiveParams[element] (which is stored encoded); then return
@@ -146,7 +145,7 @@ public:
     /// \return True if the value was successfully sampled.
     virtual bool Sample(unsigned int element, float u, float v, void* value,
                         HdTupleType dataType) const;
-
+    
 private:
     HdVtBufferSource const _buffer;
     HdEmbreeBufferSampler const _sampler;
@@ -171,16 +170,16 @@ public:
     HdEmbreeTriangleVertexSampler(TfToken const& name,
                                   VtValue const& value,
                                   VtVec3iArray const& indices)
-        : _buffer(name, value)
-        , _sampler(_buffer)
-        , _indices(indices) {}
-
+    : _buffer(name, value)
+    , _sampler(_buffer)
+    , _indices(indices) {}
+    
     /// Sample the primvar at an (element, u, v) location. For vertex primvars,
     /// the vertex indices of the triangle are stored in _indices[element][0-2].
     /// After fetching the primvar value for each of the three vertices,
     /// they are interpolated as follows, per Embree specification:
     /// t_uv = (1-u-v)*t0 + u*t1 + v*t2
-    /// 
+    ///
     /// \param element The element index to sample.
     /// \param u The u coordinate to sample.
     /// \param v The v coordinate to sample.
@@ -189,7 +188,7 @@ public:
     /// \return True if the value was successfully sampled.
     virtual bool Sample(unsigned int element, float u, float v, void* value,
                         HdTupleType dataType) const;
-
+    
 private:
     HdVtBufferSource const _buffer;
     HdEmbreeBufferSampler const _sampler;
@@ -222,16 +221,16 @@ public:
     HdEmbreeTriangleFaceVaryingSampler(TfToken const& name,
                                        VtValue const& value,
                                        HdMeshUtil &meshUtil)
-        : _buffer(name, _Triangulate(name, value, meshUtil))
-        , _sampler(_buffer) {}
-
+    : _buffer(name, _Triangulate(name, value, meshUtil))
+    , _sampler(_buffer) {}
+    
     /// Sample the primvar at an (element, u, v) location. For face varying
     /// primvars, the vertex indices are simply (element * 3 + 0->2), since
     /// all faces are triangles. After fetching the primvar value for each of
     /// the three vertices, they are interpolated as follows, per Embree
     /// specification:
     /// t_uv = (1-u-v)*t0 + u*t1 + v*t2
-    /// 
+    ///
     /// \param element The element index to sample.
     /// \param u The u coordinate to sample.
     /// \param v The v coordinate to sample.
@@ -244,7 +243,7 @@ public:
 private:
     HdVtBufferSource const _buffer;
     HdEmbreeBufferSampler const _sampler;
-
+    
     // Pass the "value" parameter through HdMeshUtils'
     // ComputeTriangulatedFaceVaryingPrimvar(), which adjusts the primvar
     // buffer data for the triangulated topology. HdMeshUtil is provided
@@ -278,14 +277,14 @@ public:
                                 RTCScene meshScene,
                                 unsigned meshId,
                                 HdEmbreeRTCBufferAllocator *allocator);
-
+    
     /// Destructor. Frees the embree user vertex buffer.
     virtual ~HdEmbreeSubdivVertexSampler();
-
+    
     /// Sample the primvar at an (element, u, v) location. This implementation
     /// delegates to rtcInterpolate(). Only float-based types (float, GfVec3f,
     /// GfMatrix4f) are allowed.
-    /// 
+    ///
     /// \param element The element index to sample.
     /// \param u The u coordinate to sample.
     /// \param v The v coordinate to sample.
@@ -294,9 +293,9 @@ public:
     /// \return True if the value was successfully sampled.
     virtual bool Sample(unsigned int element, float u, float v, void* value,
                         HdTupleType dataType) const;
-
+    
 private:
-    RTCBufferType _embreeBufferId;
+    HdEmbreeRTCBufferAllocator::value_type _embreeBufferId;
     HdVtBufferSource const _buffer;
     RTCScene _meshScene;
     unsigned _meshId;

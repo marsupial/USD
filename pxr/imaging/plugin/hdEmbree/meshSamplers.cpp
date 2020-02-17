@@ -28,25 +28,44 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+/*! maximum number of user vertex buffers for subdivision surfaces */
+#define RTC_MAX_USER_VERTEX_BUFFERS 65536
+
 // HdEmbreeRTCBufferAllocator
 
-RTCBufferType
+uint16_t
 HdEmbreeRTCBufferAllocator::Allocate()
 {
-    for (size_t i = 0; i < _bitset.size(); ++i) {
-        if (!_bitset.test(i)) {
-            _bitset.set(i);
-            return static_cast<RTCBufferType>(
-                static_cast<size_t>(RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE) + i);
-        }
+    if (_available.empty()) {
+        if (_next == RTC_MAX_USER_VERTEX_BUFFERS)
+            return static_cast<value_type>(-1);
+        return _next++;
     }
-    return static_cast<RTCBufferType>(-1);
+
+    auto itr = _available.begin();
+    value_type buffer = *itr;
+    _available.erase(itr);
+    return buffer;
 }
 
 void
-HdEmbreeRTCBufferAllocator::Free(RTCBufferType buffer)
+HdEmbreeRTCBufferAllocator::Free(value_type buffer)
 {
-    _bitset.reset(buffer - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE);
+    if (buffer == _next-1) {
+        _next = buffer;
+        return;
+    }
+    if (_available.size()+1 == _next) {
+        decltype(_available)().swap(_available);
+        _next = 0;
+        return;
+    }
+    _available.insert(buffer);
+}
+
+unsigned
+HdEmbreeRTCBufferAllocator::Slots() const {
+    return _next - _available.size();
 }
 
 // HdEmbreeConstantSampler
@@ -144,86 +163,61 @@ HdEmbreeTriangleFaceVaryingSampler::_Triangulate(TfToken const& name,
 HdEmbreeSubdivVertexSampler::HdEmbreeSubdivVertexSampler(TfToken const& name,
     VtValue const& value, RTCScene meshScene, unsigned meshId,
     HdEmbreeRTCBufferAllocator *allocator)
-    : _embreeBufferId(static_cast<RTCBufferType>(-1))
+    : _embreeBufferId(HdEmbreeRTCBufferAllocator::Invalid)
     , _buffer(name, value)
     , _meshScene(meshScene)
     , _meshId(meshId)
     , _allocator(allocator)
 {
+    RTCFormat rtcFormat = RTC_FORMAT_UNDEFINED;
+    switch (_buffer.GetTupleType().type) {
+        case HdTypeFloat:
+            rtcFormat = RTC_FORMAT_FLOAT;
+            break;
+        case HdTypeFloatVec2:
+            rtcFormat = RTC_FORMAT_FLOAT2;
+            break;
+        case HdTypeFloatVec3:
+            rtcFormat = RTC_FORMAT_FLOAT3;
+            break;
+        case HdTypeFloatVec4:
+            rtcFormat = RTC_FORMAT_FLOAT4;
+            break;
+    }
+
     // The embree API only supports float-component primvars.
-    if (HdGetComponentType(_buffer.GetTupleType().type) != HdTypeFloat) {
+    if (rtcFormat == RTC_FORMAT_UNDEFINED) {
         TF_CODING_ERROR("Embree subdivision meshes only support float-based"
             " primvars for vertex interpolation mode");
         return;
     }
+
+    // The embree API has a constant number of primvar slots (16 at last count)
+    // shared between vertex and face-varying modes.
     _embreeBufferId = _allocator->Allocate();
-    // The embree API has a constant number of primvar slots (16 at last
-    // count), shared between vertex and face-varying modes.
-    if (_embreeBufferId == static_cast<RTCBufferType>(-1)) {
+    if (_embreeBufferId == HdEmbreeRTCBufferAllocator::Invalid) {
         TF_CODING_ERROR("Embree subdivision meshes only support %d primvars"
-            " in vertex interpolation mode", 65536);
+            " in vertex interpolation mode", RTC_MAX_USER_VERTEX_BUFFERS);
         return;
     }
+
     // Tag the embree mesh object with the primvar buffer, for use by
     // rtcInterpolate.
+    RTCGeometry geo = rtcGetGeometry(_meshScene, _meshId);
+    rtcSetGeometryVertexAttributeCount(geo, _allocator->Slots());
 
-    const HdTupleType bufType = _buffer.GetTupleType();
-    assert(bufType.count == 1 && (bufType.type == HdTypeFloat || bufType.type == HdTypeFloatVec2 ||
-                                  bufType.type == HdTypeFloatVec3 || bufType.type == HdTypeFloatVec4));
-
-    rtcSetGeometryVertexAttributeCount(rtcGetGeometry(_meshScene,_meshId), (_embreeBufferId - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE) + 1);
     rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
                                RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                               _embreeBufferId - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                               RTC_FORMAT_FLOAT,
+                               _embreeBufferId,
+                               rtcFormat,
                                _buffer.GetData(),0,
-                               HdDataSizeOfTupleType(bufType),
-                               _buffer.GetNumElements() * HdGetComponentCount(bufType.type) * bufType.count);
-/*
-    switch (_buffer.GetTupleType().type) {
-        case HdTypeFloat:
-            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
-                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                                       _embreeBufferId,
-                                       RTC_FORMAT_FLOAT,
-                                       _buffer.GetData(),0,
-                                       sizeof(float),
-                                       _buffer.GetNumElements());
-            break;
-        case HdTypeFloatVec2:
-            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
-                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                                       _embreeBufferId,
-                                       RTC_FORMAT_FLOAT2,
-                                       _buffer.GetData(),0,
-                                       sizeof(GfVec2f),
-                                       _buffer.GetNumElements());
-            break;
-        case HdTypeFloatVec3:
-            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
-                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                                       _embreeBufferId,
-                                       RTC_FORMAT_FLOAT3,
-                                       _buffer.GetData(),0,
-                                       sizeof(GfVec3f),
-                                       _buffer.GetNumElements());
-            break;
-        case HdTypeFloatVec4:
-            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
-                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                                       _embreeBufferId,
-                                       RTC_FORMAT_FLOAT4,
-                                       _buffer.GetData(),0,
-                                       sizeof(GfVec4f),
-                                       _buffer.GetNumElements());
-            break;
-    }
-*/
+                               HdDataSizeOfTupleType(_buffer.GetTupleType()),
+                               _buffer.GetNumElements());
 }
 
 HdEmbreeSubdivVertexSampler::~HdEmbreeSubdivVertexSampler()
 {
-    if (_embreeBufferId != static_cast<RTCBufferType>(-1)) {
+    if (_embreeBufferId != HdEmbreeRTCBufferAllocator::Invalid) {
         _allocator->Free(_embreeBufferId);
     }
 }
@@ -234,7 +228,7 @@ HdEmbreeSubdivVertexSampler::Sample(unsigned int element, float u, float v,
 {
     // Make sure the buffer type and sample type have the same arity.
     // _embreeBufferId of -1 indicates this sampler failed to initialize.
-    if (_embreeBufferId == static_cast<RTCBufferType>(-1) ||
+    if (_embreeBufferId == HdEmbreeRTCBufferAllocator::Invalid ||
         dataType != _buffer.GetTupleType()) {
         return false;
     }
@@ -244,7 +238,7 @@ HdEmbreeSubdivVertexSampler::Sample(unsigned int element, float u, float v,
 
     rtcInterpolate1(rtcGetGeometry(_meshScene,_meshId),element,u,v,
                     RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
-                    _embreeBufferId - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                    _embreeBufferId,
                     static_cast<float*>(value),nullptr,nullptr,numFloats);
 
     return true;
