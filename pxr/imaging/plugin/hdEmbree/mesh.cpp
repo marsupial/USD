@@ -54,10 +54,8 @@ HdEmbreeMesh::HdEmbreeMesh(SdfPath const& id,
 }
 
 void
-HdEmbreeMesh::Finalize(HdRenderParam *renderParam)
+HdEmbreeMesh::_ReleaseMesh(RTCScene scene)
 {
-    RTCScene scene = static_cast<HdEmbreeRenderParam*>(renderParam)
-        ->AcquireSceneForEdit();
     // Delete any instances of this mesh in the top-level embree scene.
     for (size_t i = 0; i < _rtcInstanceIds.size(); ++i) {
         // Delete the instance context first...
@@ -67,25 +65,38 @@ HdEmbreeMesh::Finalize(HdRenderParam *renderParam)
         rtcReleaseGeometry(rtcGetGeometry(scene,_rtcInstanceIds[i]));
     }
     _rtcInstanceIds.clear();
-
+    
     // Delete the prototype geometry and the prototype scene.
+    // Delete the prototype context first...
+    TF_FOR_ALL(it, _GetPrototypeContext()->primvarMap) {
+        delete it->second;
+    }
+    delete _GetPrototypeContext();
+
+    // Destroy the old mesh, if it exists.
+    if (_rtcMeshScene != nullptr && _rtcMeshId != RTC_INVALID_GEOMETRY_ID) {
+        // Get the RTCGeometry before rtcDetachGeometry
+        // RTCGeometry geometry = rtcGetGeometry(_rtcMeshScene,_rtcMeshId);
+        rtcDetachGeometry(_rtcMeshScene, _rtcMeshId);
+        // release the prototype geometry.
+        // rtcReleaseGeometry(geometry);
+        _rtcMeshId = RTC_INVALID_GEOMETRY_ID;
+    }
+}
+
+void
+HdEmbreeMesh::Finalize(HdRenderParam *renderParam)
+{
+    RTCScene scene = static_cast<HdEmbreeRenderParam*>(renderParam)
+        ->AcquireSceneForEdit();
+
+    _ReleaseMesh(scene);
+
     if (_rtcMeshScene != nullptr) {
-        if (_rtcMeshId != RTC_INVALID_GEOMETRY_ID) {
-            // Delete the prototype context first...
-            TF_FOR_ALL(it, _GetPrototypeContext()->primvarMap) {
-                delete it->second;
-            }
-            delete _GetPrototypeContext();
-            // ... then the geometry object in the prototype scene...
-            //auto geo = rtcGetGeometry(_rtcMeshScene,_rtcMeshId);
-            rtcDetachGeometry(_rtcMeshScene, _rtcMeshId);
-            //rtcReleaseGeometry(geo);
-        }
         // ... then the prototype scene.
         rtcReleaseScene(_rtcMeshScene);
+        _rtcMeshScene = nullptr;
     }
-    _rtcMeshId = RTC_INVALID_GEOMETRY_ID;
-    _rtcMeshScene = nullptr;
 }
 
 HdDirtyBits
@@ -611,27 +622,14 @@ HdEmbreeMesh::_PopulateRtMesh(HdSceneDelegate* sceneDelegate,
 
         newMesh = true;
 
-        // Destroy the old mesh, if it exists.
-        if (_rtcMeshScene != nullptr &&
-            _rtcMeshId != RTC_INVALID_GEOMETRY_ID) {
-            // Delete the prototype context first...
-            TF_FOR_ALL(it, _GetPrototypeContext()->primvarMap) {
-                delete it->second;
-            }
-            delete _GetPrototypeContext();
-            // Get the RTCGeometry before rtcDetachGeometry
-            auto geo = rtcGetGeometry(_rtcMeshScene,_rtcMeshId);
-            rtcDetachGeometry(scene, _rtcMeshId);
-            // release the prototype geometry.
-            rtcReleaseGeometry(geo);
-            _rtcMeshId = RTC_INVALID_GEOMETRY_ID;
-        }
-
-        // Create the prototype mesh scene, if it doesn't exist yet.
         if (_rtcMeshScene == nullptr) {
+            // Create the prototype mesh scene
             _rtcMeshScene = rtcNewScene(device);
             rtcSetSceneFlags(_rtcMeshScene, RTC_SCENE_FLAG_DYNAMIC);
             rtcSetSceneBuildQuality(_rtcMeshScene, RTC_BUILD_QUALITY_LOW);
+        } else {
+            // Destroy the old mesh, if it exists.
+            _ReleaseMesh(scene);
         }
 
         // Populate either a subdiv or a triangle mesh object. The helper

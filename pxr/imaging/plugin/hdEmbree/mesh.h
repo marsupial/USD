@@ -188,6 +188,8 @@ private:
     void _CreateEmbreeSubdivMesh(RTCScene scene, RTCDevice device);
     // Utility function to call rtcNewTriangleMesh and populate topology.
     void _CreateEmbreeTriangleMesh(RTCScene scene, RTCDevice device);
+    // Utility function to release the embree geometry.
+    void _ReleaseMesh(RTCScene);
 
     // An embree intersection filter callback, for doing backface culling.
     static void _EmbreeCullFaces(const RTCFilterFunctionNArguments* args);
