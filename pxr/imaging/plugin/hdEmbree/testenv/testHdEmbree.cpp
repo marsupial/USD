@@ -105,11 +105,11 @@ private:
     // invocation executes a single render task, which draws the scene to
     // the framebuffer.
     //
-    // HdRendererPlugin (or derived classes like HdEmbreeRendererPlugin)
+    // HdRendererPlugin (or derived classes like HdEmbree3RendererPlugin)
     // are a discoverable way to create render delegates.
 
     HdEngine _engine;
-    HdEmbreeRendererPlugin *_rendererPlugin;
+    HdEmbree3RendererPlugin *_rendererPlugin;
     HdRenderDelegate *_renderDelegate;
     HdRenderIndex *_renderIndex;
     HdUnitTestDelegate *_sceneDelegate;
@@ -144,7 +144,7 @@ void HdEmbree_TestGLDrawing::InitTest()
     // This test bypasses the hydra plugin system; it creates an embree
     // renderer plugin directly, and then a render delegate, and then
     // a render index.
-    _rendererPlugin = new HdEmbreeRendererPlugin;
+    _rendererPlugin = new HdEmbree3RendererPlugin;
     TF_VERIFY(_rendererPlugin != nullptr);
 
     _renderDelegate = _rendererPlugin->CreateRenderDelegate();

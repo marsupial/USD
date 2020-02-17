@@ -3,17 +3,17 @@
         {
             "Info": {
                 "Types": {
-                    "HdEmbreeRendererPlugin": {
+                    "HdEmbree3RendererPlugin": {
                         "bases": [
                             "HdRendererPlugin"
                         ],
-                        "displayName": "Embree",
+                        "displayName": "Embree3",
                         "priority": 99
                     }
                 }
             },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
-            "Name": "hdEmbree",
+            "Name": "hdEmbree3",
             "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",
             "Root": "@PLUG_INFO_ROOT@",
             "Type": "library"

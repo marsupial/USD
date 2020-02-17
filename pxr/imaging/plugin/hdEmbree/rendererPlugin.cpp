@@ -31,30 +31,30 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Register the embree plugin with the renderer plugin system.
 TF_REGISTRY_FUNCTION(TfType)
 {
-    HdRendererPluginRegistry::Define<HdEmbreeRendererPlugin>();
+    HdRendererPluginRegistry::Define<HdEmbree3RendererPlugin>();
 }
 
 HdRenderDelegate*
-HdEmbreeRendererPlugin::CreateRenderDelegate()
+HdEmbree3RendererPlugin::CreateRenderDelegate()
 {
     return new HdEmbreeRenderDelegate();
 }
 
 HdRenderDelegate*
-HdEmbreeRendererPlugin::CreateRenderDelegate(
+HdEmbree3RendererPlugin::CreateRenderDelegate(
     HdRenderSettingsMap const& settingsMap)
 {
     return new HdEmbreeRenderDelegate(settingsMap);
 }
 
 void
-HdEmbreeRendererPlugin::DeleteRenderDelegate(HdRenderDelegate *renderDelegate)
+HdEmbree3RendererPlugin::DeleteRenderDelegate(HdRenderDelegate *renderDelegate)
 {
     delete renderDelegate;
 }
 
 bool 
-HdEmbreeRendererPlugin::IsSupported() const
+HdEmbree3RendererPlugin::IsSupported() const
 {
     // Nothing more to check for now, we assume if the plugin loads correctly
     // it is supported.

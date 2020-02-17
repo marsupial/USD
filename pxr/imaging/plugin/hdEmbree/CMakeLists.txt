@@ -1,5 +1,5 @@
 set(PXR_PREFIX pxr/imaging)
-set(PXR_PACKAGE hdEmbree)
+set(PXR_PACKAGE hdEmbree3)
 
 if(NOT EMBREE_FOUND)
     message(WARNING "Not building ${PXR_PACKAGE} because of missing dependency: Embree")
@@ -11,7 +11,7 @@ if (NOT ${PXR_ENABLE_GL_SUPPORT})
     return()
 endif()
 
-pxr_plugin(hdEmbree
+pxr_plugin(hdEmbree3
    LIBRARIES
         plug
         tf
@@ -22,7 +22,8 @@ pxr_plugin(hdEmbree
         hd
         hdx
         ${TBB_tbb_LIBRARY}
-        ${EMBREE_LIBRARY}
+        #${EMBREE_LIBRARY}
+		/Developer/local/release/lib/libembree3.dylib
 
     INCLUDE_DIRS
         ${TBB_INCLUDE_DIRS}
@@ -49,9 +50,9 @@ pxr_plugin(hdEmbree
 )
 
 if (X11_FOUND OR APPLE)
-pxr_build_test(testHdEmbree
+pxr_build_test(testHdEmbree3
     LIBRARIES
-        hdEmbree
+        hdEmbree3
         garch
         arch
     CPPFILES

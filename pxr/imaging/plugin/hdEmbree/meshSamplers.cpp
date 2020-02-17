@@ -167,26 +167,58 @@ HdEmbreeSubdivVertexSampler::HdEmbreeSubdivVertexSampler(TfToken const& name,
     // Tag the embree mesh object with the primvar buffer, for use by
     // rtcInterpolate.
 
+    const HdTupleType bufType = _buffer.GetTupleType();
+    assert(bufType.count == 1 && (bufType.type == HdTypeFloat || bufType.type == HdTypeFloatVec2 ||
+                                  bufType.type == HdTypeFloatVec3 || bufType.type == HdTypeFloatVec4));
+
+    rtcSetGeometryVertexAttributeCount(rtcGetGeometry(_meshScene,_meshId), (_embreeBufferId - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE) + 1);
     rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
-    _embreeBufferId,
-    0, // EMBREE_FIXME_COULD_NOT_INFER_SLOT,
-    RTC_FORMAT_FLOAT,
-    _buffer.GetData(),0,
-    HdDataSizeOfTupleType(_buffer.GetTupleType()),
-    _buffer.GetNumElements());
-
-#if 0
-    rtcSetBuffer(_meshScene, _meshId, _embreeBufferId,
-        _buffer.GetData(),
-        /* offset */ 0,
-        /* stride */ HdDataSizeOfTupleType(_buffer.GetTupleType()));
-
-
-RTCORE_API void rtcSetBuffer(RTCScene scene, unsigned geomID, RTCBufferType type,
-                             const void* ptr, size_t byteOffset, size_t byteStride);
-RTC_API void rtcSetSharedGeometryBuffer(RTCGeometry geometry, enum RTCBufferType type,
-unsigned int slot, enum RTCFormat format, const void* ptr, size_t byteOffset, size_t byteStride, size_t itemCount);
-#endif
+                               RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                               _embreeBufferId - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                               RTC_FORMAT_FLOAT,
+                               _buffer.GetData(),0,
+                               HdDataSizeOfTupleType(bufType),
+                               _buffer.GetNumElements() * HdGetComponentCount(bufType.type) * bufType.count);
+/*
+    switch (_buffer.GetTupleType().type) {
+        case HdTypeFloat:
+            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
+                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                                       _embreeBufferId,
+                                       RTC_FORMAT_FLOAT,
+                                       _buffer.GetData(),0,
+                                       sizeof(float),
+                                       _buffer.GetNumElements());
+            break;
+        case HdTypeFloatVec2:
+            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
+                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                                       _embreeBufferId,
+                                       RTC_FORMAT_FLOAT2,
+                                       _buffer.GetData(),0,
+                                       sizeof(GfVec2f),
+                                       _buffer.GetNumElements());
+            break;
+        case HdTypeFloatVec3:
+            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
+                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                                       _embreeBufferId,
+                                       RTC_FORMAT_FLOAT3,
+                                       _buffer.GetData(),0,
+                                       sizeof(GfVec3f),
+                                       _buffer.GetNumElements());
+            break;
+        case HdTypeFloatVec4:
+            rtcSetSharedGeometryBuffer(rtcGetGeometry(_meshScene,_meshId),
+                                       RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                                       _embreeBufferId,
+                                       RTC_FORMAT_FLOAT4,
+                                       _buffer.GetData(),0,
+                                       sizeof(GfVec4f),
+                                       _buffer.GetNumElements());
+            break;
+    }
+*/
 }
 
 HdEmbreeSubdivVertexSampler::~HdEmbreeSubdivVertexSampler()
@@ -211,8 +243,8 @@ HdEmbreeSubdivVertexSampler::Sample(unsigned int element, float u, float v,
     size_t numFloats = HdGetComponentCount(dataType.type) * dataType.count;
 
     rtcInterpolate1(rtcGetGeometry(_meshScene,_meshId),element,u,v,
-                    _embreeBufferId,
-                    0, // EMBREE_FIXME_COULD_NOT_INFER_SLOT,
+                    RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
+                    _embreeBufferId - RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,
                     static_cast<float*>(value),nullptr,nullptr,numFloats);
 
     return true;

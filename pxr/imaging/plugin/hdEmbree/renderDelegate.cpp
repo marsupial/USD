@@ -153,8 +153,8 @@ HdEmbreeRenderDelegate::_Initialize()
     //
     // XXX: Investigate ray packets.
     _rtcScene = rtcNewScene(_rtcDevice);
-    // rtcSetSceneFlags(_rtcScene,RTC_SCENE_FLAG_DYNAMIC | RTC_BUILD_QUALITY_LOW); // EMBREE_FIXME: set proper scene flags
-    // rtcSetSceneBuildQuality(_rtcScene,RTC_SCENE_FLAG_DYNAMIC | RTC_BUILD_QUALITY_LOW); // EMBREE_FIXME: set proper build quality
+    rtcSetSceneFlags(_rtcScene, RTC_SCENE_FLAG_DYNAMIC);
+    rtcSetSceneBuildQuality(_rtcScene, RTC_BUILD_QUALITY_MEDIUM);
 
     // Store top-level embree objects inside a render param that can be
     // passed to prims during Sync(). Also pass a handle to the render thread.

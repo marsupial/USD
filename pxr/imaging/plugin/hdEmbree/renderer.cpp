@@ -685,19 +685,19 @@ HdEmbreeRenderer::_ComputeId(RTCRayHit const& rayHitIn, TfToken const& idType,
 }
 
 bool
-HdEmbreeRenderer::_ComputeDepth(RTCRayHit const& rayHit,
+HdEmbreeRenderer::_ComputeDepth(RTCRayHit const& rayHitIn,
                                 float *depth,
                                 bool clip)
 {
-    const RTCHit& rayHit = rayHitIn.hit;
-    if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
+    if (rayHitIn.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return false;
     }
 
+    const RTCRay& ray = rayHitIn.ray;
     if (clip) {
-        GfVec3f hitPos = GfVec3f(rayHit.org[0] + rayHit.tfar * rayHit.dir[0],
-            rayHit.org[1] + rayHit.tfar * rayHit.dir[1],
-            rayHit.org[2] + rayHit.tfar * rayHit.dir[2]);
+        GfVec3f hitPos = GfVec3f(ray.org_x + ray.tfar * ray.dir_x,
+            ray.org_y + ray.tfar * ray.dir_y,
+            ray.org_z + ray.tfar * ray.dir_z);
 
         hitPos = _viewMatrix.Transform(hitPos);
         hitPos = _projMatrix.Transform(hitPos);
@@ -705,7 +705,7 @@ HdEmbreeRenderer::_ComputeDepth(RTCRayHit const& rayHit,
         // For the depth range transform, we assume [0,1].
         *depth = (hitPos[2] + 1.0f) / 2.0f;
     } else {
-        *depth = rayHit.ray.tfar;
+        *depth = ray.tfar;
     }
     return true;
 }
@@ -716,19 +716,19 @@ HdEmbreeRenderer::_ComputeNormal(RTCRayHit const& rayHitIn,
                                  bool eye)
 {
     const RTCHit& rayHit = rayHitIn.hit;
-    if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
+    if (rayHit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return false;
     }
 
     HdEmbreeInstanceContext *instanceContext =
         static_cast<HdEmbreeInstanceContext*>(
-                rtcGetUserData(_scene, rayHit.instID));
+                rtcGetGeometryUserData(rtcGetGeometry(_scene, rayHit.instID[0])));
 
     HdEmbreePrototypeContext *prototypeContext =
         static_cast<HdEmbreePrototypeContext*>(
-                rtcGetUserData(instanceContext->rootScene, rayHit.geomID));
+                rtcGetGeometryUserData(rtcGetGeometry(instanceContext->rootScene, rayHit.geomID)));
 
-    GfVec3f n = -GfVec3f(rayHit.Ng[0], rayHit.Ng[1], rayHit.Ng[2]);
+    GfVec3f n = -GfVec3f(rayHit.Ng_x, rayHit.Ng_y, rayHit.Ng_z);
     if (prototypeContext->primvarMap.count(HdTokens->normals) > 0) {
         prototypeContext->primvarMap[HdTokens->normals]->Sample(
                 rayHit.primID, rayHit.u, rayHit.v, &n);
@@ -756,11 +756,11 @@ HdEmbreeRenderer::_ComputePrimvar(RTCRayHit const& rayHitIn,
 
     HdEmbreeInstanceContext *instanceContext =
         static_cast<HdEmbreeInstanceContext*>(
-                rtcGetUserData(_scene, rayHit.instID));
+                rtcGetGeometryUserData(rtcGetGeometry(_scene, rayHit.instID[0])));
 
     HdEmbreePrototypeContext *prototypeContext =
         static_cast<HdEmbreePrototypeContext*>(
-                rtcGetUserData(instanceContext->rootScene, rayHit.geomID));
+                rtcGetGeometryUserData(rtcGetGeometry(instanceContext->rootScene, rayHit.geomID)));
 
     // XXX: This is a little clunky, although sample will early out if the
     // types don't match.

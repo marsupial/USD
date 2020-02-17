@@ -78,7 +78,7 @@ HdEmbreeMesh::Finalize(HdRenderParam *renderParam)
             delete _GetPrototypeContext();
             // ... then the geometry object in the prototype scene...
             //auto geo = rtcGetGeometry(_rtcMeshScene,_rtcMeshId);
-            rtcDetachGeometry(scene, _rtcMeshId);
+            rtcDetachGeometry(_rtcMeshScene, _rtcMeshId);
             //rtcReleaseGeometry(geo);
         }
         // ... then the prototype scene.
@@ -257,8 +257,9 @@ HdEmbreeMesh::_CreateEmbreeSubdivMesh(RTCScene scene, RTCDevice device)
     // Fill the topology buffers.
     rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_FACE,0,RTC_FORMAT_UINT,_topology.GetFaceVertexCounts().cdata(),0,sizeof(int),_topology.GetFaceVertexCounts().size());
     rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT,_topology.GetFaceVertexIndices().cdata(),0,sizeof(int),_topology.GetFaceVertexIndices().size());
-    rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_HOLE,0,RTC_FORMAT_UINT,_topology.GetHoleIndices().cdata(),0,sizeof(int),_topology.GetFaceVertexCounts().size());
-
+    if (const size_t nHoles = _topology.GetHoleIndices().size())
+        rtcSetSharedGeometryBuffer(geom_2,RTC_BUFFER_TYPE_HOLE,0,RTC_FORMAT_UINT, _topology.GetHoleIndices().cdata(), 0, sizeof(int), nHoles);
+    
     // If this topology has edge creases, unroll the edge crease buffer.
     if (numEdgeCreases > 0) {
         int *embreeCreaseIndices = static_cast<int*>(rtcSetNewGeometryBuffer(geom_2,RTC_BUFFER_TYPE_EDGE_CREASE_INDEX,0,RTC_FORMAT_UINT2,2*sizeof(int),numEdgeCreases));
@@ -789,32 +790,40 @@ HdEmbreeMesh::_PopulateRtMesh(HdSceneDelegate* sceneDelegate,
         }
         _rtcInstanceIds.resize(newSize);
 
+        auto setTransform = [&](RTCGeometry geometry, HdEmbreeInstanceContext* ctx, size_t i) {
+            // Combine the local transform and the instance transform.
+            GfMatrix4f matf = _transform * GfMatrix4f(transforms[i]);
+            // Update the transform in the BVH.
+            rtcSetGeometryTransform(geometry, 0, RTC_FORMAT_FLOAT4X4_COLUMN_MAJOR, matf.GetArray());
+            // Update the transform in the instance context.
+            ctx->objectToWorldMatrix = matf;
+            ctx->instanceId = i;
+            // Mark the instance as updated in the BVH.
+            rtcCommitGeometry(geometry);
+        };
+
         // Size up (if necessary).
         for(size_t i = oldSize; i < newSize; ++i) {
             // Create the new instance.
             // EMBREE_FIXME: check if geometry gets properly committed
             RTCGeometry geom_0 = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_INSTANCE);
-            rtcSetGeometryInstancedScene(geom_0, _rtcMeshScene);
-            rtcSetGeometryTimeStepCount(geom_0, 1);
-            _rtcInstanceIds[i] = rtcAttachGeometry(scene, geom_0);
-            rtcReleaseGeometry(geom_0);
+
             // Create the instance context.
             HdEmbreeInstanceContext *ctx = new HdEmbreeInstanceContext;
             ctx->rootScene = _rtcMeshScene;
-            rtcSetGeometryUserData(rtcGetGeometry(scene,_rtcInstanceIds[i]),ctx);
+            rtcSetGeometryUserData(geom_0, ctx);
+
+            rtcSetGeometryInstancedScene(geom_0, _rtcMeshScene);
+            rtcSetGeometryTimeStepCount(geom_0, 1);
+
+            setTransform(geom_0, ctx, i);
+            _rtcInstanceIds[i] = rtcAttachGeometry(scene, geom_0);
+            rtcReleaseGeometry(geom_0);
         }
 
         // Update transforms.
-        for (size_t i = 0; i < transforms.size(); ++i) {
-            // Combine the local transform and the instance transform.
-            GfMatrix4f matf = _transform * GfMatrix4f(transforms[i]);
-            // Update the transform in the BVH.
-            rtcSetGeometryTransform(rtcGetGeometry(scene,_rtcInstanceIds[i]),0,RTC_FORMAT_FLOAT4X4_COLUMN_MAJOR,matf.GetArray());
-            // Update the transform in the instance context.
-            _GetInstanceContext(scene, i)->objectToWorldMatrix = matf;
-            _GetInstanceContext(scene, i)->instanceId = i;
-            // Mark the instance as updated in the BVH.
-            rtcCommitGeometry(rtcGetGeometry(scene,_rtcInstanceIds[i]));
+        for (size_t i = 0, n = std::min(oldSize, newSize); i < n; ++i) {
+            setTransform(rtcGetGeometry(scene,_rtcInstanceIds[i]), _GetInstanceContext(scene, i), i);
         }
     }
     // Otherwise, create our single instance (if necessary) and update
